@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jelly Tank</title>
+<meta name="description" content="An interactive ASCII aquarium of soft-body jellyfish, rendered as characters.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:rgba(255,255,255,.92);
+    --ink-2:rgba(255,255,255,.60);
+    --ink-3:rgba(255,255,255,.36);
+    --hair:rgba(255,255,255,.14);
+    --paper:#03070f;
+    --serif:"Instrument Serif","Playfair Display",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--paper);overflow:hidden;color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+  canvas#tank{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+  canvas#tank.grab{cursor:grabbing}
+
+  #ui{position:fixed;inset:0;pointer-events:none;z-index:2;transition:opacity .45s ease}
+  #ui > *{pointer-events:auto}
+  body.hide-ui #ui{opacity:0;pointer-events:none}
+  body.hide-ui #ui > *{pointer-events:none}
+
+  .label{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);font-weight:400}
+  .label b{color:var(--ink-2);font-weight:400}
+  .label .sep{margin:0 .5em;color:var(--ink-3)}
+
+  /* masthead */
+  .masthead{position:absolute;left:40px;top:34px;max-width:440px}
+  .masthead h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:76px;line-height:.92;letter-spacing:-.012em;margin:16px 0 18px -3px;color:var(--ink)}
+  .masthead p{font-size:12px;line-height:1.6;color:var(--ink-2);max-width:292px;font-weight:400}
+
+  /* colophon */
+  .colophon{position:absolute;left:40px;bottom:32px;width:360px}
+  .colophon .how{font-family:var(--serif);font-style:italic;font-size:17px;line-height:1.38;color:var(--ink-2);margin-bottom:18px;max-width:330px}
+  .stats{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--ink-3);display:flex;flex-wrap:wrap;border-top:1px solid var(--hair);padding-top:11px;column-gap:18px;row-gap:4px;white-space:nowrap}
+  .stats b{color:var(--ink-2);font-weight:400;font-variant-numeric:tabular-nums}
+
+  /* control card */
+  .card{position:absolute;right:40px;top:34px;width:240px;border-top:1px solid var(--hair);padding-top:11px}
+  .card-h{display:flex;justify-content:space-between;align-items:baseline}
+  .card-h .sheet-tg{display:none}
+  .sec{border-bottom:1px solid var(--hair);padding:13px 0 14px}
+  .card-body > .sec:last-child{border-bottom:0}
+  .sec > .label{margin-bottom:10px;display:flex;justify-content:space-between}
+  .swatches{display:flex;gap:7px}
+  .sw{width:26px;height:15px;border:1px solid var(--hair);cursor:pointer;background-size:100% 100%;opacity:.8}
+  .sw:hover{opacity:1}
+  .sw.on{opacity:1;outline:1px solid var(--ink);outline-offset:2px}
+  .ramps{display:flex;gap:16px;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.04em}
+  .ramps span{cursor:pointer;padding-bottom:3px;border-bottom:1px solid transparent}
+  .ramps span:hover{color:var(--ink-2)}
+  .ramps span.on{color:var(--ink);border-bottom-color:var(--ink)}
+  .row{display:grid;grid-template-columns:84px 1fr 30px;align-items:center;column-gap:12px;height:23px}
+  .row .label{margin:0;letter-spacing:.16em}
+  .row output{font-family:var(--mono);font-size:10px;color:var(--ink-3);text-align:right;font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:1px;background:rgba(255,255,255,.22);outline:none;cursor:ew-resize;margin:0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;background:var(--paper);border:1px solid var(--ink);border-radius:0}
+  input[type=range]::-moz-range-thumb{width:5px;height:5px;background:var(--paper);border:1px solid var(--ink);border-radius:0}
+  input[type=range]::-moz-range-track{height:1px;background:rgba(255,255,255,.22)}
+  .toggles{display:flex;flex-direction:column;gap:8px}
+  .tg{display:flex;justify-content:space-between;cursor:pointer;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);user-select:none}
+  .tg i{font-style:normal;color:var(--ink-3);letter-spacing:.1em}
+  .tg:hover{color:var(--ink-2)}
+  .tg.on{color:var(--ink-2)} .tg.on i{color:var(--ink)}
+  .btns{display:flex;flex-wrap:wrap;column-gap:18px;row-gap:9px}
+  .btn{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);background:none;border:0;border-bottom:1px solid var(--hair);padding:0 0 3px;cursor:pointer;border-radius:0}
+  .btn:hover{color:var(--ink);border-bottom-color:var(--ink)}
+  .btn.about-btn{display:none}
+
+  /* about */
+  .about{position:absolute;right:40px;bottom:34px;font-family:var(--serif);font-style:italic;font-size:16px;color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--hair);padding-bottom:1px}
+  .about:hover{color:var(--ink);border-bottom-color:var(--ink)}
+  .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(2,5,12,.72);z-index:5}
+  .modal[hidden]{display:none}
+  .modal-in{width:min(440px,calc(100vw - 40px));border:1px solid var(--hair);background:var(--paper);padding:30px 34px 28px}
+  .modal-in h2{font-family:var(--serif);font-style:italic;font-weight:400;font-size:40px;line-height:1;margin:12px 0 16px}
+  .modal-in p{font-size:12.5px;line-height:1.65;color:var(--ink-2);margin-bottom:12px}
+  .modal-in .keys{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--ink-3);line-height:1.9;margin:6px 0 18px}
+  .modal-in .keys b{color:var(--ink-2);font-weight:400;display:inline-block;width:64px}
+
+  .hint{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap;transition:opacity 1s}
+  .hint.gone{opacity:0}
+
+  @media (max-width:1100px){ .hint{display:none} }
+  @media (max-width:700px){
+    .masthead{left:20px;top:22px;max-width:calc(100vw - 40px)}
+    .masthead h1{font-size:50px;margin-top:10px}
+    .masthead p{font-size:11.5px;max-width:260px}
+    .colophon{left:20px;bottom:62px;width:calc(100vw - 40px)}
+    .colophon .how{display:none}
+    .stats{font-size:9px;column-gap:12px}
+    .about{display:none}
+    .btn.about-btn{display:inline}
+    .hint{display:none}
+    .card{right:0;top:auto;bottom:0;left:0;width:100%;background:rgba(3,7,15,.92);backdrop-filter:blur(10px);border-top:1px solid var(--hair);padding:0 20px;max-height:12px}
+    .card{max-height:none}
+    .card .card-h{padding:13px 0 12px;cursor:pointer}
+    .card-h .sheet-tg{display:inline;color:var(--ink-3);letter-spacing:.16em}
+    .card .card-body{display:none;max-height:52vh;overflow-y:auto;padding-bottom:18px}
+    .card.open .card-body{display:block}
+    .card.open .sheet-tg{color:var(--ink)}
+    body.sheet-open .colophon, body.sheet-open .about{opacity:0;pointer-events:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="tank"></canvas>
+
+<div id="ui">
+  <header class="masthead">
+    <div class="label">Jelly Tank <span class="sep">/</span> No. 01 <span class="sep">/</span> ASCII soft-body</div>
+    <h1>Jelly Tank.</h1>
+    <p>A tank of soft-bodied jellyfish, simulated as springs and chains, then rendered as nothing but type. Stir the water with the cursor. Click to add one, drag to catch one.</p>
+  </header>
+
+  <section class="colophon">
+    <p class="how">Each bell is a ring of twenty-four points held by springs. A pulse squeezes the ring and pushes the body up; tentacles hang as chains that only ever follow. The grid samples the body's density and picks a character for every cell.</p>
+    <div class="stats" id="stats">
+      <span><b id="sFps">60</b> fps</span>
+      <span><b id="sJel">0</b> jellies</span>
+      <span><b id="sPts">0</b> points</span>
+      <span><b id="sGrid">0×0</b> grid</span>
+      <span><b id="sTime">00:00</b> elapsed</span>
+    </div>
+  </section>
+
+  <aside class="card" id="card">
+    <div class="label card-h" id="cardHead"><span>The Aquarium</span><span class="sheet-tg">controls</span></div>
+    <div class="card-body">
+      <div class="sec">
+        <div class="label"><span>Palette</span><b id="palName">Abyss</b></div>
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div class="sec">
+        <div class="label"><span>Character ramp</span></div>
+        <div class="ramps" id="ramps"></div>
+      </div>
+      <div class="sec" id="sliders"></div>
+      <div class="sec toggles" id="toggles"></div>
+      <div class="sec btns" id="btns"></div>
+    </div>
+  </aside>
+
+  <div class="hint" id="hint">move to stir <span class="sep">·</span> click to spawn <span class="sep">·</span> drag to catch <span class="sep">·</span> shift for current</div>
+
+  <a href="#" class="about" id="aboutLink">about the experiment</a>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-in">
+      <div class="label">About the experiment</div>
+      <h2>Jelly Tank.</h2>
+      <p>A small study in making characters feel wet. Every frame, a field of soft bodies is sampled onto a monospace grid and each cell is given one glyph from a ramp. There are no sprites and no images. The bell is a ring of points on springs with a non-sinusoidal pulse; the tentacles are Verlet chains dragged through a coarse velocity field that you stir with the cursor.</p>
+      <p>Built as a single HTML file with no dependencies beyond two typefaces.</p>
+      <div class="keys">
+        <div><b>space</b>pause</div>
+        <div><b>r</b>reset the tank</div>
+        <div><b>s</b>save a PNG</div>
+        <div><b>h</b>hide the interface</div>
+        <div><b>shift</b>hold and move for a current</div>
+      </div>
+      <button class="btn" id="modalClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   JELLY TANK  —  architecture
+
+   1. GRID / FIELD
+      The canvas is divided into a monospace character grid (cell ≈ 9×16 px,
+      recomputed on resize and on the grid slider). Three typed arrays cover
+      the grid:   dens  Float32  accumulated density per cell
+                  own   Int16    index of the jelly contributing the most
+                  ownD  Float32  that jelly's contribution (for the argmax)
+      Every frame the field is cleared, each jelly stamps its bell (an
+      analytic dome profile evaluated against the *actual* deformed ring)
+      and its chains (point stamps along each tentacle), then the renderer
+      maps density → character index in the active ramp and density →
+      brightness in a per-jelly cached colour table. No per-cell objects.
+
+   2. WATER
+      A coarse 48×27 velocity grid (vx, vy Float32). The pointer injects
+      velocity (shift = strong, wide "current"), bell pulses inject a jet
+      behind the jelly. Each step: semi-Lagrangian advection, neighbour
+      diffusion, exponential decay (viscosity). Bilinear sampling is used by
+      tentacle points, ring points, jelly centres and marine snow.
+
+   3. SOFT BODY (Jelly)
+      Bell: ring of N=24 Verlet points around a centre. Each point has a rest
+      radius from a dome profile (full radius on top, ~0.58 R on the
+      underside, plus per-jelly asymmetry). The pulse phase drives a
+      contraction c(t) with a fast squeeze and slow relax (not a sine): the
+      target shape narrows laterally and lengthens along the heading. Points
+      are solved with: shape-matching pull → radial spring to centre (which
+      also pushes the centre back, so walls squash the bell) → chord springs
+      to neighbours → grab pull → wall clamps. dc/dt > 0 produces thrust along
+      the heading; between pulses the body sinks and drifts with the water.
+      Tentacles: 6–10 Verlet chains (14–24 points) anchored at lower rim
+      points; 4 shorter, thicker oral arms anchored under the centre. Weak
+      gravity, drag, water coupling, slight sway and bend stiffness.
+
+   4. RENDERER (per frame)
+      bg gradient → caustic shimmer (top rows) → marine snow → glow (a
+      cols×rows ImageData of the field, blurred at ¼ scale and composited
+      additively) → characters (fillText, fillStyle switched only when the
+      cached colour string changes) → optional mesh overlay.
+
+   5. UI STATE
+      A single CFG object; controls write CFG and call small apply hooks
+      (rebuild grid, resize jelly list, rebuild colour caches). Keys:
+      space pause · R reset · S save PNG · H hide UI. Pointer: move stirs,
+      click spawns, drag grabs/flings, shift = current.
+   ===================================================================== */
+(() => {
+'use strict';
+
+/* ---------- utilities ---------- */
+const TAU = Math.PI * 2, HALF = Math.PI / 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+let seed = (Date.now() % 100000) | 1;
+const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+const rr = (a, b) => a + (b - a) * rnd();
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  let r, g, b;
+  if (h < 60) [r, g, b] = [c, x, 0]; else if (h < 120) [r, g, b] = [x, c, 0]; else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c]; else if (h < 300) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+function pulseShape(p) {            // fast squeeze, slow relax
+  const sq = 0.2;
+  if (p < sq) { const u = p / sq; return u * u * (3 - 2 * u); }
+  const u = (p - sq) / (1 - sq);
+  return Math.pow(1 - smooth(u), 1.15);
+}
+function easeOutBack(t) { t = clamp(t, 0, 1); const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+
+/* ---------- config ---------- */
+const CFG = {
+  count: 12, pulseSpeed: 1, tentLen: 1, viscosity: 0.45, glow: 0.6, cell: 9,
+  snow: true, caustics: true, mesh: false, palette: 'abyss', ramp: 0, paused: false,
+};
+
+const PALETTES = {
+  abyss:    { name: 'Abyss',      bg: ['#06112a', '#020409'], jellies: [[204, 88, 64], [228, 72, 68], [262, 62, 70], [188, 84, 60], [245, 58, 72], [200, 44, 80]], snow: [212, 50, 72], caustic: [202, 70, 72] },
+  reef:     { name: 'Reef',       bg: ['#061826', '#02070d'], jellies: [[14, 88, 66], [172, 72, 58], [332, 72, 68], [42, 92, 66], [196, 82, 62], [290, 56, 72]], snow: [180, 36, 72], caustic: [168, 60, 70] },
+  mono:     { name: 'Monochrome', bg: ['#0c0c0d', '#030303'], jellies: [[0, 0, 72], [0, 0, 62], [0, 0, 80], [0, 0, 56], [0, 0, 68], [0, 0, 76]], snow: [0, 0, 70], caustic: [0, 0, 72] },
+  phosphor: { name: 'Phosphor',   bg: ['#03130a', '#010401'], jellies: [[122, 92, 60], [136, 82, 66], [112, 86, 58], [150, 72, 62], [126, 96, 70], [100, 72, 62]], snow: [120, 60, 55], caustic: [122, 70, 60] },
+  amber:    { name: 'Amber',      bg: ['#160c02', '#050201'], jellies: [[38, 100, 58], [30, 95, 62], [45, 90, 66], [25, 90, 56], [40, 80, 72], [50, 85, 60]], snow: [38, 70, 55], caustic: [40, 72, 60] },
+  candy:    { name: 'Candy',      bg: ['#140a22', '#05030a'], jellies: [[332, 92, 74], [160, 72, 70], [272, 82, 78], [50, 96, 72], [200, 92, 74], [10, 92, 74]], snow: [300, 40, 75], caustic: [282, 52, 76] },
+};
+// lo/hi: lightness offsets for the darkest/brightest level; a0: alpha of the darkest level.
+// Glyphs with near-constant coverage (blocks, katakana) carry tone through colour instead.
+const RAMPS = [
+  { name: 'ascii',    chars: " .':-=+*#%@",   lo: -14, hi: 22, a0: 0.74 },
+  { name: 'blocks',   chars: ' ·:░▒▓█',       lo: -30, hi: 14, a0: 0.62 },
+  { name: 'katakana', chars: ' ･ｰｨｯｱｳｴﾗﾖﾎﾐ', lo: -32, hi: 20, a0: 0.6 },
+];
+
+/* ---------- canvas & grid ---------- */
+const canvas = document.getElementById('tank');
+const ctx = canvas.getContext('2d', { alpha: false });
+let W = 1, H = 1, dpr = 1;
+const G = { cw: 9, ch: 16, cols: 0, rows: 0, n: 0, font: '', dens: null, own: null, ownD: null, fontPx: 15 };
+const glowC = document.createElement('canvas'), glowX = glowC.getContext('2d');
+const midC = document.createElement('canvas'), midX = midC.getContext('2d');
+let glowImg = null, bgGrad = null;
+const HAS_FILTER = ('filter' in ctx);
+
+function buildGrid() {
+  G.cw = CFG.cell; G.ch = Math.round(CFG.cell * 1.78);
+  G.cols = Math.ceil(W / G.cw); G.rows = Math.ceil(H / G.ch); G.n = G.cols * G.rows;
+  G.dens = new Float32Array(G.n); G.own = new Int16Array(G.n); G.ownD = new Float32Array(G.n);
+  G.fontPx = Math.round(G.cw / 0.6);
+  G.font = `${G.fontPx}px "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace`;
+  glowC.width = G.cols; glowC.height = G.rows;
+  glowImg = glowX.createImageData(G.cols, G.rows);
+  midC.width = Math.max(1, Math.round(W / 4)); midC.height = Math.max(1, Math.round(H / 4));
+  atlasReset();
+  initSnow();
+}
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  bgGrad = null;
+  buildGrid();
+  WATER.cx = W / WATER.cols; WATER.cy = H / WATER.rows;
+}
+
+/* ---------- water ---------- */
+const WATER = (() => {
+  const cols = 48, rows = 27, n = cols * rows;
+  return { cols, rows, n, vx: new Float32Array(n), vy: new Float32Array(n), tx: new Float32Array(n), ty: new Float32Array(n), cx: 10, cy: 10 };
+})();
+const wsample = new Float32Array(2);
+function waterSample(px, py) {
+  const { cols, rows, vx, vy, cx, cy } = WATER;
+  let fx = px / cx - 0.5, fy = py / cy - 0.5;
+  fx = clamp(fx, 0, cols - 1.001); fy = clamp(fy, 0, rows - 1.001);
+  const i0 = fx | 0, j0 = fy | 0, tx = fx - i0, ty = fy - j0;
+  const a = j0 * cols + i0, b = a + 1, c = a + cols, d = c + 1;
+  wsample[0] = (vx[a] * (1 - tx) + vx[b] * tx) * (1 - ty) + (vx[c] * (1 - tx) + vx[d] * tx) * ty;
+  wsample[1] = (vy[a] * (1 - tx) + vy[b] * tx) * (1 - ty) + (vy[c] * (1 - tx) + vy[d] * tx) * ty;
+  return wsample;
+}
+function waterInject(px, py, ax, ay, radius, amount) {
+  const { cols, rows, vx, vy, cx, cy } = WATER;
+  const fx = px / cx - 0.5, fy = py / cy - 0.5;
+  const r = Math.ceil(radius);
+  const i0 = clamp(Math.floor(fx - r), 0, cols - 1), i1 = clamp(Math.ceil(fx + r), 0, cols - 1);
+  const j0 = clamp(Math.floor(fy - r), 0, rows - 1), j1 = clamp(Math.ceil(fy + r), 0, rows - 1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const dx = i - fx, dy = j - fy, d2 = (dx * dx + dy * dy) / (radius * radius);
+    if (d2 > 1) continue;
+    const w = (1 - d2) * (1 - d2) * amount, k = j * cols + i;
+    vx[k] += (ax - vx[k]) * w; vy[k] += (ay - vy[k]) * w;
+  }
+}
+function waterStep(dt) {
+  const { cols, rows, vx, vy, tx, ty, cx, cy } = WATER;
+  const decay = Math.exp(-(0.35 + CFG.viscosity * 3.2) * dt);
+  const diff = 0.18;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const k = j * cols + i;
+    // semi-Lagrangian backtrace in cell units
+    let fx = i - vx[k] * dt / cx, fy = j - vy[k] * dt / cy;
+    fx = clamp(fx, 0, cols - 1.001); fy = clamp(fy, 0, rows - 1.001);
+    const i0 = fx | 0, j0 = fy | 0, sx = fx - i0, sy = fy - j0;
+    const a = j0 * cols + i0, b = a + 1, c = a + cols, d = c + 1;
+    let ax = (vx[a] * (1 - sx) + vx[b] * sx) * (1 - sy) + (vx[c] * (1 - sx) + vx[d] * sx) * sy;
+    let ay = (vy[a] * (1 - sx) + vy[b] * sx) * (1 - sy) + (vy[c] * (1 - sx) + vy[d] * sx) * sy;
+    // diffusion with 4-neighbourhood
+    const l = i > 0 ? k - 1 : k, r = i < cols - 1 ? k + 1 : k, u = j > 0 ? k - cols : k, dn = j < rows - 1 ? k + cols : k;
+    const nx = (vx[l] + vx[r] + vx[u] + vx[dn]) * 0.25, ny = (vy[l] + vy[r] + vy[u] + vy[dn]) * 0.25;
+    tx[k] = (ax + (nx - ax) * diff) * decay;
+    ty[k] = (ay + (ny - ay) * diff) * decay;
+  }
+  vx.set(tx); vy.set(ty);
+}
+
+/* ---------- chains (tentacles / oral arms) ---------- */
+function makeChain(n, len, thick, taper, anchor, lx, ly) {
+  return { n, x: new Float32Array(n), y: new Float32Array(n), px: new Float32Array(n), py: new Float32Array(n),
+           len, thick, taper, anchor, lx, ly, seed: rr(0, 100), sway: rr(0.6, 1.4) };
+}
+function chainInit(ch, ax, ay) {
+  const seg = ch.len / (ch.n - 1);
+  for (let k = 0; k < ch.n; k++) { ch.x[k] = ch.px[k] = ax + rr(-1, 1); ch.y[k] = ch.py[k] = ay + k * seg; }
+}
+function chainStep(ch, ax, ay, dt, t, lenMul, grav, cpl) {
+  const n = ch.n, x = ch.x, y = ch.y, px = ch.px, py = ch.py;
+  const seg = ch.len * lenMul / (n - 1);
+  x[0] = ax; y[0] = ay;
+  const damp = 0.965, g = grav * dt * dt;
+  for (let k = 1; k < n; k++) {
+    let vx = (x[k] - px[k]) * damp, vy = (y[k] - py[k]) * damp;
+    const w = waterSample(x[k], y[k]);
+    vx += (w[0] * dt - vx) * cpl; vy += (w[1] * dt - vy) * cpl;
+    vy += g;
+    const f = k / n;
+    vx += Math.sin(t * 1.3 * ch.sway - k * 0.22 + ch.seed) * 0.07 * f;
+    vy += Math.cos(t * 0.9 * ch.sway - k * 0.17 + ch.seed) * 0.02 * f;
+    px[k] = x[k]; py[k] = y[k]; x[k] += vx; y[k] += vy;
+  }
+  for (let it = 0; it < 2; it++) {
+    for (let k = 1; k < n; k++) {
+      let dx = x[k] - x[k - 1], dy = y[k] - y[k - 1];
+      let d = Math.sqrt(dx * dx + dy * dy) || 1e-4;
+      const diff = (d - seg) / d;
+      if (k === 1) { x[k] -= dx * diff; y[k] -= dy * diff; }
+      else { x[k] -= dx * diff * 0.5; y[k] -= dy * diff * 0.5; x[k - 1] += dx * diff * 0.5; y[k - 1] += dy * diff * 0.5; }
+    }
+    // bend stiffness: nudge toward straight continuation
+    for (let k = 2; k < n; k++) {
+      const ex = 2 * x[k - 1] - x[k - 2], ey = 2 * y[k - 1] - y[k - 2];
+      x[k] += (ex - x[k]) * 0.035; y[k] += (ey - y[k]) * 0.035;
+    }
+    x[0] = ax; y[0] = ay;
+  }
+  // keep inside tank, soft
+  for (let k = 1; k < n; k++) {
+    if (x[k] < 2) x[k] = 2; else if (x[k] > W - 2) x[k] = W - 2;
+    if (y[k] > H - 2) y[k] = H - 2; else if (y[k] < 2) y[k] = 2;
+  }
+}
+
+/* ---------- jelly ---------- */
+let simTime = 0;
+const jellies = [];
+let jellySerial = 0;
+
+class Jelly {
+  constructor(x, y, o = {}) {
+    const sz = clamp(Math.min(W, H) / 900, 0.55, 1.4);
+    this.R = (o.R || rr(54, 104)) * sz;
+    this.buoy = rr(0.75, 1.3);                 // how hard this one swims relative to its sink
+    this.pref = rr(0.14, 0.62);                // preferred depth (fraction of tank height); thrust fades above it
+    this.N = 24; const N = this.N;
+    this.ang = new Float32Array(N); this.rest = new Float32Array(N);
+    this.lx = new Float32Array(N); this.ly = new Float32Array(N);
+    this.tx = new Float32Array(N); this.ty = new Float32Array(N);
+    this.tr = new Float32Array(N); this.chord = new Float32Array(N);
+    this.px = new Float32Array(N); this.py = new Float32Array(N);
+    this.ppx = new Float32Array(N); this.ppy = new Float32Array(N);
+    this.rr = new Float32Array(N);
+    this.asym = rr(-0.08, 0.08);
+    this.flat = rr(0.36, 0.48);
+    for (let i = 0; i < N; i++) {
+      const a = -Math.PI + i * TAU / N;
+      const down = Math.max(0, Math.sin(a));
+      this.ang[i] = a;
+      this.rest[i] = this.R * (1 - this.flat * Math.pow(down, 1.4)) * (1 + this.asym * Math.cos(a)) * rr(0.975, 1.025);
+    }
+    this.cx = x; this.cy = y; this.vx = 0; this.vy = 0; this.ocx = x; this.ocy = y;
+    this.heading = -HALF + rr(-0.35, 0.35);
+    this.wPh = rr(0, TAU); this.wSpd = rr(0.5, 1.5);
+    this.phase = o.phase !== undefined ? o.phase : rr(0, 1);
+    this.rate = rr(0.30, 0.62); this.rateJit = 1; this.c = 0; this.dc = 0;
+    this.born = simTime; this.scale = 0.15; this.alpha = 0; this.instant = !!o.instant;
+    this.seed = rr(0, 100);
+    this.grabbed = false; this.gx = 0; this.gy = 0;
+    this.id = jellySerial++; this.row = 0; this.atlasGen = -1;
+    this.ci = o.ci !== undefined ? o.ci : this.id;
+    this.hueJit = rr(-7, 7);
+    this.canals = 4 + ((rnd() * 3) | 0);
+    // tentacles from lower rim
+    const cand = [];
+    for (let i = 0; i < N; i++) if (Math.sin(this.ang[i]) > 0.22) cand.push(i);
+    const tc = o.tents || (6 + ((rnd() * 5) | 0));
+    this.tents = [];
+    for (let k = 0; k < tc; k++) {
+      const idx = cand[Math.round(k * (cand.length - 1) / (tc - 1))];
+      const len = this.R * rr(2.1, 3.6);
+      const n = clamp(Math.round(len / 11), 14, 24);
+      this.tents.push(makeChain(n, len, rr(0.52, 0.7), 0.42, idx, 0, 0));
+    }
+    this.arms = [];
+    const armX = [-0.22, -0.08, 0.08, 0.22];
+    for (let k = 0; k < 4; k++) {
+      const len = this.R * rr(1.0, 1.5);
+      this.arms.push(makeChain(10, len, rr(0.6, 0.72), 0.5, -1, armX[k] * this.R, 0.2 * this.R));
+    }
+    this.placeRing(true);
+    for (const t of this.tents) chainInit(t, this.px[t.anchor], this.py[t.anchor]);
+    for (const a of this.arms) chainInit(a, this.cx + a.lx, this.cy + a.ly);
+    this.setPalette(PALETTES[CFG.palette]);
+  }
+  setPalette(pal) {
+    const base = pal.jellies[this.ci % pal.jellies.length];
+    const h = base[0] + (base[1] > 0 ? this.hueJit : 0), s = base[1], l = base[2];
+    this.h = h; this.s = s; this.l = l;
+    const rgb = hslToRgb(h, s, l); this.r = rgb[0]; this.g = rgb[1]; this.b = rgb[2];
+    this.buildCols();
+  }
+  buildCols() {
+    const rp = RAMPS[CFG.ramp], L = rp.chars.length;
+    this.cols = new Array(L);
+    for (let k = 0; k < L; k++) {
+      const t = k / (L - 1);
+      const l = lerp(this.l + rp.lo, Math.min(97, this.l + rp.hi), Math.pow(t, 0.75));
+      const s = this.s * (1 - 0.45 * t * t);
+      const a = rp.a0 + (1 - rp.a0) * t;
+      this.cols[k] = `hsla(${this.h.toFixed(0)},${s.toFixed(0)}%,${l.toFixed(0)}%,${a.toFixed(2)})`;
+    }
+    this.atlasGen = -1;
+  }
+  targets() {
+    const N = this.N, c = this.c, rot = this.heading + HALF, cr = Math.cos(rot), sr = Math.sin(rot), sc = this.scale;
+    const lx = this.lx, ly = this.ly;
+    for (let i = 0; i < N; i++) {
+      const a = this.ang[i], r = this.rest[i] * sc;
+      let x = Math.cos(a) * r, y = Math.sin(a) * r;
+      x *= (1 - 0.30 * c);
+      y *= y < 0 ? (1 + 0.11 * c) : (1 - 0.24 * c);
+      lx[i] = x; ly[i] = y; this.tr[i] = Math.sqrt(x * x + y * y);
+      this.tx[i] = this.cx + x * cr - y * sr; this.ty[i] = this.cy + x * sr + y * cr;
+    }
+    for (let i = 0; i < N; i++) { const j = (i + 1) % N; const dx = lx[i] - lx[j], dy = ly[i] - ly[j]; this.chord[i] = Math.sqrt(dx * dx + dy * dy); }
+  }
+  placeRing(init) {
+    this.targets();
+    for (let i = 0; i < this.N; i++) { this.px[i] = this.ppx[i] = this.tx[i]; this.py[i] = this.ppy[i] = this.ty[i]; }
+  }
+  step(dt, t) {
+    // spawn animation
+    const age = t - this.born;
+    if (this.instant) { this.scale = 1; this.alpha = 1; }
+    else { this.scale = age < 1.1 ? lerp(0.15, 1, easeOutBack(age / 1.1)) : 1; this.alpha = smooth(age / 0.7); }
+    // pulse
+    const prevC = this.c;
+    this.phase += dt * this.rate * CFG.pulseSpeed * this.rateJit;
+    if (this.phase >= 1) { this.phase -= 1; this.rateJit = rr(0.78, 1.22); }
+    this.c = pulseShape(this.phase);
+    this.dc = (this.c - prevC) / dt;
+    const depth = clamp((this.cy - H * (this.pref - 0.12)) / (H * 0.3), 0.06, 1);
+    const thrust = Math.max(0, this.dc) * this.R * 0.62 * depth * this.buoy;
+    const hx = Math.cos(this.heading), hy = Math.sin(this.heading);
+    this.vx += hx * thrust * dt; this.vy += hy * thrust * dt;
+    // sink, water, drag
+    this.vy += 8 * dt;
+    const w = waterSample(this.cx, this.cy);
+    this.vx += (w[0] - this.vx) * 1.1 * dt; this.vy += (w[1] - this.vy) * 1.1 * dt;
+    const drag = Math.exp(-1.15 * dt); this.vx *= drag; this.vy *= drag;
+    // heading wander + edge steering
+    let target = -HALF + Math.sin(t * 0.11 * this.wSpd + this.wPh) * 0.8 + Math.sin(t * 0.037 * this.wSpd + this.seed) * 0.4;
+    const m = W * 0.16;
+    if (this.cx < m) target += (1 - this.cx / m) * 1.2;
+    else if (this.cx > W - m) target -= (1 - (W - this.cx) / m) * 1.2;
+    this.heading += (target - this.heading) * 0.7 * dt;
+    // grab
+    if (this.grabbed) {
+      const k = 1 - Math.exp(-14 * dt);
+      this.vx = lerp(this.vx, (this.gx - this.cx) * 9, k); this.vy = lerp(this.vy, (this.gy - this.cy) * 9, k);
+    }
+    // bounds for centre
+    const lim = this.R * 0.55;
+    if (this.cx < lim && this.vx < 0) this.vx = -this.vx * 0.35 + 6;
+    if (this.cx > W - lim && this.vx > 0) this.vx = -this.vx * 0.35 - 6;
+    if (this.cy < lim && this.vy < 0) this.vy = -this.vy * 0.25 + 4;
+    if (this.cy > H - lim * 0.6 && this.vy > 0) this.vy = -this.vy * 0.25 - 6;
+    this.ocx = this.cx; this.ocy = this.cy;
+    this.cx += this.vx * dt; this.cy += this.vy * dt;
+    // water jet behind the bell during the squeeze
+    if (this.dc > 0.2) {
+      const s = this.dc * this.R * 0.9 * this.alpha;
+      waterInject(this.cx - hx * this.R * 0.9, this.cy - hy * this.R * 0.9, -hx * s, -hy * s, 2.2, 0.12 * dt * 60);
+    }
+    this.stepRing(dt);
+    // chains
+    const lenMul = CFG.tentLen;
+    for (const tn of this.tents) chainStep(tn, this.px[tn.anchor], this.py[tn.anchor], dt, t, lenMul, 14, 0.09);
+    const rot = this.heading + HALF, cr = Math.cos(rot), sr = Math.sin(rot);
+    for (const a of this.arms) {
+      const ax = this.cx + (a.lx * cr - a.ly * sr) * this.scale, ay = this.cy + (a.lx * sr + a.ly * cr) * this.scale;
+      chainStep(a, ax, ay, dt, t, lenMul * 0.9, 22, 0.07);
+    }
+  }
+  stepRing(dt) {
+    const N = this.N, px = this.px, py = this.py, ppx = this.ppx, ppy = this.ppy;
+    this.targets();
+    const dcx = this.cx - this.ocx, dcy = this.cy - this.ocy;
+    for (let i = 0; i < N; i++) {
+      let vx = (px[i] - ppx[i]) * 0.86, vy = (py[i] - ppy[i]) * 0.86;
+      const w = waterSample(px[i], py[i]);
+      vx += (w[0] * dt - vx) * 0.14; vy += (w[1] * dt - vy) * 0.14;
+      ppx[i] = px[i]; ppy[i] = py[i];
+      px[i] += vx + dcx * 0.82; py[i] += vy + dcy * 0.82;
+    }
+    const tx = this.tx, ty = this.ty, tr = this.tr, chord = this.chord;
+    const gR = this.R * 1.15;
+    for (let it = 0; it < 4; it++) {
+      // recompute targets around the (possibly moved) centre
+      const rot = this.heading + HALF, cr = Math.cos(rot), sr = Math.sin(rot);
+      for (let i = 0; i < N; i++) { tx[i] = this.cx + this.lx[i] * cr - this.ly[i] * sr; ty[i] = this.cy + this.lx[i] * sr + this.ly[i] * cr; }
+      for (let i = 0; i < N; i++) {
+        // shape matching
+        px[i] += (tx[i] - px[i]) * 0.12; py[i] += (ty[i] - py[i]) * 0.12;
+        // radial spring
+        let dx = px[i] - this.cx, dy = py[i] - this.cy, d = Math.sqrt(dx * dx + dy * dy) || 1e-4;
+        let diff = (d - tr[i]) / d;
+        px[i] -= dx * diff * 0.45; py[i] -= dy * diff * 0.45;
+        this.cx += dx * diff * 0.035; this.cy += dy * diff * 0.035;
+        // chord to next
+        const j = (i + 1) % N;
+        dx = px[j] - px[i]; dy = py[j] - py[i]; d = Math.sqrt(dx * dx + dy * dy) || 1e-4;
+        diff = (d - chord[i]) / d * 0.5;
+        px[i] += dx * diff * 0.5; py[i] += dy * diff * 0.5; px[j] -= dx * diff * 0.5; py[j] -= dy * diff * 0.5;
+        // grab deformation
+        if (this.grabbed) {
+          const gx = this.gx - px[i], gy = this.gy - py[i], gd = Math.sqrt(gx * gx + gy * gy);
+          const wgt = clamp(1 - gd / gR, 0, 1);
+          px[i] += gx * 0.22 * wgt * wgt; py[i] += gy * 0.22 * wgt * wgt;
+        }
+        // walls
+        if (px[i] < 3) { px[i] = 3; if (ppx[i] < 3) ppx[i] = 3; }
+        else if (px[i] > W - 3) { px[i] = W - 3; if (ppx[i] > W - 3) ppx[i] = W - 3; }
+        if (py[i] < 3) { py[i] = 3; if (ppy[i] < 3) ppy[i] = 3; }
+        else if (py[i] > H - 3) { py[i] = H - 3; if (ppy[i] > H - 3) ppy[i] = H - 3; }
+      }
+    }
+    for (let i = 0; i < N; i++) { const dx = px[i] - this.cx, dy = py[i] - this.cy; this.rr[i] = Math.sqrt(dx * dx + dy * dy); }
+  }
+  points() { let n = this.N; for (const t of this.tents) n += t.n; for (const a of this.arms) n += a.n; return n; }
+}
+
+/* ---------- density stamping ---------- */
+function stampCell(ix, iy, d, ji) {
+  if (ix < 0 || iy < 0 || ix >= G.cols || iy >= G.rows) return;
+  const k = iy * G.cols + ix;
+  G.dens[k] += d;
+  if (d > G.ownD[k]) { G.ownD[k] = d; G.own[k] = ji; }
+}
+function stampBell(j, ji, t) {
+  const N = j.N, cw = G.cw, ch = G.ch, cols = G.cols, rows = G.rows;
+  let maxR = 0; for (let i = 0; i < N; i++) if (j.rr[i] > maxR) maxR = j.rr[i];
+  const pad = maxR * 1.16 + cw;
+  const x0 = Math.max(0, Math.floor((j.cx - pad) / cw)), x1 = Math.min(cols - 1, Math.ceil((j.cx + pad) / cw));
+  const y0 = Math.max(0, Math.floor((j.cy - pad) / ch)), y1 = Math.min(rows - 1, Math.ceil((j.cy + pad) / ch));
+  const rot = j.heading + HALF, hx = Math.cos(j.heading), hy = Math.sin(j.heading);
+  const invSec = N / TAU, rr = j.rr, dens = G.dens, ownD = G.ownD, own = G.own;
+  const alpha = j.alpha * (1 + 0.18 * j.c), canals = j.canals, R = j.R * j.scale;
+  const sd = j.seed;
+  for (let iy = y0; iy <= y1; iy++) {
+    const py = (iy + 0.5) * ch, dy = py - j.cy;
+    for (let ix = x0; ix <= x1; ix++) {
+      const px = (ix + 0.5) * cw, dx = px - j.cx;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > pad) continue;
+      let a = Math.atan2(dy, dx) - rot;
+      a = a - Math.floor((a + Math.PI) / TAU) * TAU;          // wrap to [-π, π)
+      const f = (a + Math.PI) * invSec;
+      let i0 = f | 0; const ft = f - i0; i0 = i0 % N; const i1 = (i0 + 1) % N;
+      const rim = rr[i0] + (rr[i1] - rr[i0]) * ft;
+      const r = dist / (rim || 1);
+      if (r > 1.14) continue;
+      const down = Math.sin(a);                                 // >0 on the underside
+      const up = clamp((dx * hx + dy * hy) / rim, 0, 1);        // 0 at the equator, 1 at the apex
+      const sig = down > 0 ? 0.13 : 0.085;
+      const band = Math.exp(-((r - 0.92) * (r - 0.92)) / (sig * sig)) * (down > 0 ? 0.8 : 0.34 + 0.12 * up);
+      let d = band;
+      if (r < 1) {
+        // translucent volume: fresnel-thick toward the silhouette, lit from the apex
+        const edge = r * r;
+        const inner = 0.2 + 0.5 * edge + 0.22 * up * (1 - 0.5 * edge) - 0.07 * Math.max(0, down) * r;
+        // radial canals
+        const ca = a * canals / TAU; const cf = Math.abs(ca - Math.round(ca));
+        const canal = Math.exp(-cf * cf * 90) * 0.12 * r * (down > 0 ? 0.3 : 1);
+        // manubrium / oral mass under the centre
+        const ly = (dx * hx + dy * hy), lx = (-dx * hy + dy * hx);
+        const mb = 0.3 * Math.exp(-((lx * lx) / (0.085 * R * R) + ((ly + 0.22 * R) * (ly + 0.22 * R)) / (0.08 * R * R)));
+        d += (inner + canal + mb) * (1 - smooth((r - 0.92) / 0.08));
+      }
+      const shim = 0.92 + 0.08 * Math.sin(ix * 0.8 + t * 2.3 + sd) * Math.sin(iy * 1.1 - t * 1.7);
+      d *= shim * alpha;
+      if (d < 0.02) continue;
+      const k = iy * cols + ix;
+      dens[k] += d;
+      if (d > ownD[k]) { ownD[k] = d; own[k] = ji; }
+    }
+  }
+}
+// chains blend with max, not add: a dozen chain points crossing one cell must not saturate it
+function stampMax(ix, iy, d, ji) {
+  if (ix < 0 || iy < 0 || ix >= G.cols || iy >= G.rows) return;
+  const k = iy * G.cols + ix;
+  if (d > G.dens[k]) G.dens[k] = d;
+  if (d > G.ownD[k]) { G.ownD[k] = d; G.own[k] = ji; }
+}
+function stampChain(ch, ji, t, alpha) {
+  const n = ch.n, x = ch.x, y = ch.y, cw = G.cw, chh = G.ch;
+  const base = ch.thick * alpha, taper = ch.taper, inv = 1 / (n - 1);
+  const stepLen = Math.min(cw, chh) * 0.55;
+  let lix = -1, liy = -1;
+  for (let k = 1; k < n; k++) {
+    const x0 = x[k - 1], y0 = y[k - 1], x1 = x[k], y1 = y[k];
+    const dx = x1 - x0, dy = y1 - y0, segLen = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(1, Math.ceil(segLen / stepLen));
+    for (let si = 1; si <= steps; si++) {
+      const u = si / steps, f = (k - 1 + u) * inv;
+      const px = x0 + dx * u, py = y0 + dy * u;
+      const ix = (px / cw) | 0, iy = (py / chh) | 0;
+      if (ix === lix && iy === liy) continue;
+      const d = base * (1 - taper * f) * (0.7 + 0.3 * Math.sin(f * n * 1.1 - t * 3.2 + ch.seed));
+      stampMax(ix, iy, d, ji);
+      lix = ix; liy = iy;
+    }
+  }
+}
+
+/* ---------- marine snow ---------- */
+const SNOW = { n: 0, x: null, y: null, s: null, c: null };
+function initSnow() {
+  const n = Math.round(G.n / 30);
+  SNOW.n = n; SNOW.x = new Float32Array(n); SNOW.y = new Float32Array(n); SNOW.s = new Float32Array(n); SNOW.c = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { SNOW.x[i] = rr(0, W); SNOW.y[i] = rr(0, H); SNOW.s[i] = rr(4, 14); SNOW.c[i] = (rnd() * 4) | 0; }
+}
+function snowStep(dt, t) {
+  const n = SNOW.n, x = SNOW.x, y = SNOW.y, s = SNOW.s;
+  for (let i = 0; i < n; i++) {
+    const w = waterSample(x[i], y[i]);
+    y[i] += -s[i] * dt + w[1] * dt * 0.8;
+    x[i] += w[0] * dt * 0.8 + Math.sin(t * 0.4 + i) * 2 * dt;
+    if (y[i] < -4) { y[i] = H + 2; x[i] = rr(0, W); }
+    else if (y[i] > H + 4) y[i] = -2;
+    if (x[i] < -4) x[i] = W + 2; else if (x[i] > W + 4) x[i] = -2;
+  }
+}
+
+/* ---------- glyph atlas ----------
+   Every (colour row × ramp level) glyph is rasterised once; the hot loop
+   only does drawImage blits. Rows are handed out lazily per key; the whole
+   atlas is invalidated (gen++) when the grid, ramp or palette changes. */
+const ATLAS = { c: document.createElement('canvas'), x: null, rows: new Map(), next: 0, max: 64, aw: 1, ah: 1, gen: 0 };
+ATLAS.x = ATLAS.c.getContext('2d');
+function atlasReset() {
+  ATLAS.aw = Math.round(G.cw * dpr); ATLAS.ah = Math.round(G.ch * dpr);
+  ATLAS.c.width = 16 * ATLAS.aw; ATLAS.c.height = ATLAS.max * ATLAS.ah;
+  ATLAS.rows.clear(); ATLAS.next = 0; ATLAS.gen++;
+  const x = ATLAS.x; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.font = G.font; x.textBaseline = 'top'; x.textAlign = 'left';
+}
+function atlasRow(key, colors, chars) {
+  const have = ATLAS.rows.get(key); if (have !== undefined) return have;
+  if (ATLAS.next >= ATLAS.max) { atlasReset(); }
+  const row = ATLAS.next++; ATLAS.rows.set(key, row);
+  const x = ATLAS.x, cw = G.cw, ch = G.ch;
+  x.font = G.font; x.textBaseline = 'top';
+  x.clearRect(0, row * ch, 16 * cw, ch);
+  for (let k = 0; k < chars.length && k < 16; k++) { x.fillStyle = colors[k]; x.fillText(chars[k], k * cw, row * ch); }
+  return row;
+}
+
+/* ---------- renderer ---------- */
+let pal = PALETTES[CFG.palette];
+let snowCols = [], causCols = [];
+function paletteCols() {
+  const sn = pal.snow, ca = pal.caustic;
+  snowCols = [`hsla(${sn[0]},${sn[1]}%,${sn[2]}%,0.16)`, `hsla(${sn[0]},${sn[1]}%,${sn[2]}%,0.30)`];
+  causCols = [`hsla(${ca[0]},${ca[1]}%,${ca[2]}%,0.07)`, `hsla(${ca[0]},${ca[1]}%,${ca[2]}%,0.13)`, `hsla(${ca[0]},${ca[1]}%,${ca[2]}%,0.22)`, `hsla(${ca[0]},${ca[1]}%,${ca[2]}%,0.34)`];
+}
+const CAUS = ' .-~=';
+const SNOWCH = ['.', ',', '.', '·'];
+
+function render(t) {
+  const { cw, ch, cols, rows, dens, own, n } = G;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!bgGrad) { bgGrad = ctx.createLinearGradient(0, 0, 0, H); bgGrad.addColorStop(0, pal.bg[0]); bgGrad.addColorStop(1, pal.bg[1]); }
+  ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
+  ctx.font = G.font; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+
+  // density field
+  let tp = performance.now();
+  dens.fill(0); G.ownD.fill(0);
+  for (let ji = 0; ji < jellies.length; ji++) {
+    const j = jellies[ji];
+    stampBell(j, ji, t);
+    for (const tn of j.tents) stampChain(tn, ji, t, j.alpha);
+    for (const a of j.arms) stampChain(a, ji, t, j.alpha);
+  }
+
+  pField = performance.now() - tp; tp = performance.now();
+  // caustics (top rows only, glyphs from the atlas)
+  if (CFG.caustics) {
+    const crow = Math.min(rows, 10), row = atlasRow('caus', causCols, CAUS.slice(1));
+    for (let iy = 0; iy < crow; iy++) {
+      const fade = 1 - iy / crow, py = iy * ch;
+      for (let ix = 0; ix < cols; ix++) {
+        const fx = ix * 0.33;
+        let v = Math.sin(fx + t * 0.9 + Math.sin(iy * 0.7 + t * 0.5) * 1.6) * Math.sin(fx * 0.47 - t * 0.6 + iy * 0.9 + Math.sin(fx * 0.2 + t * 0.3));
+        v = v * v * fade;
+        if (v < 0.22) continue;
+        const lvl = v > 0.75 ? 3 : v > 0.55 ? 2 : v > 0.38 ? 1 : 0;
+        ctx.drawImage(ATLAS.c, lvl * ATLAS.aw, row * ATLAS.ah, ATLAS.aw, ATLAS.ah, ix * cw, py, cw, ch);
+      }
+    }
+  }
+  // marine snow
+  if (CFG.snow) {
+    const { n: sn, x, y, c } = SNOW;
+    const r0 = atlasRow('snow0', [snowCols[0], snowCols[0], snowCols[0], snowCols[0]], SNOWCH);
+    const r1 = atlasRow('snow1', [snowCols[1], snowCols[1], snowCols[1], snowCols[1]], SNOWCH);
+    const aw = ATLAS.aw, ah = ATLAS.ah;
+    for (let i = 0; i < sn; i++) {
+      const row = (i & 1) ? r1 : r0;
+      ctx.drawImage(ATLAS.c, c[i] * aw, row * ah, aw, ah, ((x[i] / cw) | 0) * cw, ((y[i] / ch) | 0) * ch, cw, ch);
+    }
+  }
+  pBg = performance.now() - tp; tp = performance.now();
+  // glow
+  if (CFG.glow > 0.01 && jellies.length) {
+    const gi = glowImg.data; gi.fill(0);
+    const ga = CFG.glow * 255;
+    for (let k = 0; k < n; k++) {
+      const d = dens[k]; if (d < 0.05) continue;
+      const j = jellies[own[k]]; const q = k << 2;
+      gi[q] = j.r; gi[q + 1] = j.g; gi[q + 2] = j.b; gi[q + 3] = (Math.min(1, d) * ga) | 0;
+    }
+    glowX.putImageData(glowImg, 0, 0);
+    midX.clearRect(0, 0, midC.width, midC.height);
+    midX.imageSmoothingEnabled = true;
+    if (HAS_FILTER) midX.filter = 'blur(2.5px)';
+    midX.drawImage(glowC, 0, 0, midC.width, midC.height);
+    if (HAS_FILTER) midX.filter = 'none';
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(midC, 0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  pGlow = performance.now() - tp; tp = performance.now();
+  // characters: one drawImage per occupied cell from the glyph atlas
+  const ramp = RAMPS[CFG.ramp].chars, L = ramp.length;
+  for (let ji = 0; ji < jellies.length; ji++) { const j = jellies[ji]; if (j.atlasGen !== ATLAS.gen) { j.row = atlasRow('j' + j.id, j.cols, ramp); j.atlasGen = ATLAS.gen; } }
+  const A = ATLAS.c, aw = ATLAS.aw, ah = ATLAS.ah;
+  let k = 0;
+  for (let iy = 0; iy < rows; iy++) {
+    const py = iy * ch;
+    for (let ix = 0; ix < cols; ix++, k++) {
+      const d = dens[k]; if (d < 0.04) continue;
+      let lvl = (d * L) | 0; if (lvl >= L) lvl = L - 1; if (lvl === 0) continue;
+      ctx.drawImage(A, lvl * aw, jellies[own[k]].row * ah, aw, ah, ix * cw, py, cw, ch);
+    }
+  }
+  pText = performance.now() - tp;
+  // mesh overlay
+  if (CFG.mesh) drawMesh();
+}
+function drawMesh() {
+  ctx.lineWidth = 1;
+  for (const j of jellies) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    for (let i = 0; i < j.N; i++) { if (i === 0) ctx.moveTo(j.px[i], j.py[i]); else ctx.lineTo(j.px[i], j.py[i]); }
+    ctx.closePath(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.beginPath();
+    for (let i = 0; i < j.N; i++) { ctx.moveTo(j.cx, j.cy); ctx.lineTo(j.px[i], j.py[i]); }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    for (const c of j.tents.concat(j.arms)) { ctx.moveTo(c.x[0], c.y[0]); for (let k = 1; k < c.n; k++) ctx.lineTo(c.x[k], c.y[k]); }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let i = 0; i < j.N; i++) ctx.fillRect(j.px[i] - 1, j.py[i] - 1, 2, 2);
+    ctx.fillRect(j.cx - 2, j.cy - 2, 4, 4);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath(); ctx.moveTo(j.cx, j.cy); ctx.lineTo(j.cx + Math.cos(j.heading) * j.R * 0.6, j.cy + Math.sin(j.heading) * j.R * 0.6); ctx.stroke();
+  }
+}
+
+/* ---------- population ---------- */
+function spawn(x, y, o) { const j = new Jelly(x, y, o); jellies.push(j); return j; }
+function populate(count) {
+  jellies.length = 0;
+  if (!count) return;
+  // jittered grid so the tank reads as evenly stocked on first load
+  const gc = Math.max(1, Math.round(Math.sqrt(count * W / H))), gr = Math.max(1, Math.ceil(count / gc));
+  const order = []; for (let i = 0; i < gc * gr; i++) order.push(i);
+  for (let i = order.length - 1; i > 0; i--) { const k = (rnd() * (i + 1)) | 0; [order[i], order[k]] = [order[k], order[i]]; }
+  for (let i = 0; i < count; i++) {
+    const cell = order[i], gx = cell % gc, gy = (cell / gc) | 0;
+    const x = W * (0.08 + 0.84 * (gx + rr(0.2, 0.8)) / gc), y = H * (0.1 + 0.68 * (gy + rr(0.2, 0.8)) / gr);
+    spawn(x, y, { instant: true, ci: i, phase: i / count + rr(0, 0.1) });
+  }
+}
+function setCount(c) {
+  CFG.count = c;
+  while (jellies.length > c) jellies.pop();
+  while (jellies.length < c) spawn(rr(W * 0.1, W * 0.9), rr(H * 0.1, H * 0.7), { ci: jellies.length });
+}
+
+/* ---------- sim loop ---------- */
+const DT = 1 / 60;
+let acc = 0, lastT = performance.now(), fpsEma = 60, frameMs = 0;
+let waterAcc = 0;
+function step(dt) {
+  simTime += dt;
+  waterStep(dt);
+  for (const j of jellies) j.step(dt, simTime);
+  if (CFG.snow) snowStep(dt, simTime);
+}
+const PROF = { sim: 0, field: 0, bg: 0, glow: 0, text: 0 };
+let pSim = 0, pField = 0, pBg = 0, pGlow = 0, pText = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const t0 = performance.now();
+  let dt = (now - lastT) / 1000; lastT = now;
+  if (dt > 0.1) dt = 0.1; if (dt <= 0) dt = DT;
+  fpsEma = lerp(fpsEma, 1 / dt, 0.06);
+  if (!CFG.paused) {
+    acc += dt; let k = 0;
+    while (acc >= DT && k < 3) { step(DT); acc -= DT; k++; }
+    if (acc > DT) acc = 0;
+  }
+  const t1 = performance.now();
+  render(simTime);
+  const t2 = performance.now();
+  frameMs = lerp(frameMs, t2 - t0, 0.08);
+  PROF.sim = lerp(PROF.sim, t1 - t0, 0.08);
+  PROF.field = lerp(PROF.field, pField, 0.08); PROF.bg = lerp(PROF.bg, pBg, 0.08);
+  PROF.glow = lerp(PROF.glow, pGlow, 0.08); PROF.text = lerp(PROF.text, pText, 0.08);
+}
+
+/* ---------- pointer ---------- */
+const mouse = { x: -1e4, y: -1e4, lx: -1e4, ly: -1e4, vx: 0, vy: 0, t: 0, down: false, dx: 0, dy: 0, dt: 0, shift: false, grab: null, hinted: false };
+function toLocal(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+canvas.addEventListener('pointermove', e => {
+  const [x, y] = toLocal(e); const now = performance.now();
+  const dt = Math.max(0.004, (now - mouse.t) / 1000);
+  if (mouse.t > 0 && mouse.x > -1e3) {
+    const vx = (x - mouse.x) / dt, vy = (y - mouse.y) / dt;
+    mouse.vx = lerp(mouse.vx, vx, 0.5); mouse.vy = lerp(mouse.vy, vy, 0.5);
+    const sp = Math.hypot(vx, vy), cap = 900, s = sp > cap ? cap / sp : 1;
+    const strong = mouse.shift || e.shiftKey;
+    waterInject(x, y, vx * s * (strong ? 1.6 : 0.55), vy * s * (strong ? 1.6 : 0.55), strong ? 4.5 : 1.9, strong ? 0.5 : 0.32);
+    if (!mouse.hinted && sp > 40) { mouse.hinted = true; setTimeout(() => document.getElementById('hint').classList.add('gone'), 6000); }
+  }
+  mouse.x = x; mouse.y = y; mouse.t = now;
+  if (mouse.grab) { mouse.grab.gx = x; mouse.grab.gy = y; }
+});
+canvas.addEventListener('pointerdown', e => {
+  const [x, y] = toLocal(e);
+  canvas.setPointerCapture(e.pointerId);
+  mouse.down = true; mouse.dx = x; mouse.dy = y; mouse.dt = performance.now(); mouse.x = x; mouse.y = y; mouse.t = performance.now();
+  let best = null, bd = 1e9;
+  for (const j of jellies) {
+    const d = Math.hypot(j.cx - x, j.cy - y);
+    if (d < Math.max(j.R * 1.15, 36) && d < bd) { bd = d; best = j; }
+  }
+  if (best) { best.grabbed = true; best.gx = x; best.gy = y; mouse.grab = best; canvas.classList.add('grab'); }
+});
+function pointerUp(e) {
+  if (!mouse.down) return;
+  mouse.down = false;
+  const [x, y] = e ? toLocal(e) : [mouse.x, mouse.y];
+  const moved = Math.hypot(x - mouse.dx, y - mouse.dy), held = performance.now() - mouse.dt;
+  if (mouse.grab) {
+    const j = mouse.grab; j.grabbed = false;
+    j.vx = mouse.vx * 0.85; j.vy = mouse.vy * 0.85;
+    mouse.grab = null; canvas.classList.remove('grab');
+    if (moved < 5 && held < 350) {} // a tap on a jelly just nudges it
+  } else if (moved < 6 && held < 400) {
+    spawn(x, y, { ci: jellySerial });
+    CFG.count = jellies.length; syncSlider('count');
+  }
+  mouse.vx *= 0.3; mouse.vy *= 0.3;
+}
+canvas.addEventListener('pointerup', pointerUp);
+canvas.addEventListener('pointercancel', pointerUp);
+canvas.addEventListener('pointerleave', () => { mouse.x = -1e4; mouse.y = -1e4; });
+
+/* ---------- keyboard ---------- */
+window.addEventListener('keydown', e => {
+  if (e.key === 'Shift') mouse.shift = true;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+  else if (e.key === 'r' || e.key === 'R') resetTank();
+  else if (e.key === 's' || e.key === 'S') savePNG();
+  else if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('hide-ui');
+  else if (e.key === 'Escape') closeModal();
+});
+window.addEventListener('keyup', e => { if (e.key === 'Shift') mouse.shift = false; });
+
+/* ---------- actions ---------- */
+function togglePause() { CFG.paused = !CFG.paused; const b = document.getElementById('btnPause'); if (b) b.textContent = CFG.paused ? 'Resume' : 'Pause'; }
+function resetTank() { simTime = 0; WATER.vx.fill(0); WATER.vy.fill(0); populate(CFG.count); }
+function savePNG() {
+  const a = document.createElement('a');
+  a.download = `jelly-tank-${Math.round(simTime)}s.png`;
+  canvas.toBlob(b => { a.href = URL.createObjectURL(b); a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+}
+function setPalette(key) {
+  CFG.palette = key; pal = PALETTES[key]; bgGrad = null; paletteCols(); atlasReset();
+  for (const j of jellies) j.setPalette(pal);
+  document.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.key === key));
+  document.getElementById('palName').textContent = pal.name;
+}
+function setRamp(i) {
+  CFG.ramp = i; for (const j of jellies) j.buildCols(); atlasReset();
+  document.querySelectorAll('.ramps span').forEach((s, k) => s.classList.toggle('on', k === i));
+}
+function randomize() {
+  const keys = Object.keys(PALETTES);
+  setPalette(keys[(rnd() * keys.length) | 0]);
+  setRamp((rnd() * RAMPS.length) | 0);
+  CFG.pulseSpeed = +rr(0.7, 1.6).toFixed(2); CFG.tentLen = +rr(0.6, 1.6).toFixed(2); CFG.viscosity = +rr(0.2, 0.8).toFixed(2); CFG.glow = +rr(0.35, 0.9).toFixed(2);
+  CFG.count = 6 + ((rnd() * 12) | 0);
+  ['pulseSpeed', 'tentLen', 'viscosity', 'glow', 'count'].forEach(syncSlider);
+  populate(CFG.count);
+}
+
+/* ---------- UI ---------- */
+const SLIDERS = [
+  { key: 'count', label: 'Jellies', min: 0, max: 24, step: 1, fmt: v => v, apply: v => setCount(v) },
+  { key: 'pulseSpeed', label: 'Pulse', min: 0.3, max: 2.5, step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'tentLen', label: 'Tentacles', min: 0.4, max: 2.2, step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'viscosity', label: 'Viscosity', min: 0, max: 1, step: 0.02, fmt: v => v.toFixed(2) },
+  { key: 'glow', label: 'Glow', min: 0, max: 1, step: 0.02, fmt: v => v.toFixed(2) },
+  { key: 'cell', label: 'Grid', min: 6, max: 14, step: 1, fmt: v => `${v}px`, apply: () => { buildGrid(); } },
+];
+const sliderEls = {};
+function syncSlider(key) { const s = sliderEls[key]; if (!s) return; s.input.value = CFG[key]; s.out.textContent = s.spec.fmt(CFG[key]); }
+function buildUI() {
+  const sw = document.getElementById('swatches');
+  for (const key of Object.keys(PALETTES)) {
+    const p = PALETTES[key], el = document.createElement('div');
+    el.className = 'sw' + (key === CFG.palette ? ' on' : ''); el.dataset.key = key; el.title = p.name;
+    const stops = p.jellies.slice(0, 4).map((c, i) => `hsl(${c[0]},${c[1]}%,${Math.min(80, c[2])}%) ${i * 25}% ${(i + 1) * 25}%`).join(',');
+    el.style.backgroundImage = `linear-gradient(90deg,${stops})`;
+    el.addEventListener('click', () => setPalette(key));
+    sw.appendChild(el);
+  }
+  const rp = document.getElementById('ramps');
+  RAMPS.forEach((r, i) => {
+    const el = document.createElement('span'); el.textContent = r.name; el.className = i === CFG.ramp ? 'on' : '';
+    el.addEventListener('click', () => setRamp(i)); rp.appendChild(el);
+  });
+  const sl = document.getElementById('sliders');
+  for (const spec of SLIDERS) {
+    const row = document.createElement('div'); row.className = 'row';
+    const lab = document.createElement('div'); lab.className = 'label'; lab.textContent = spec.label;
+    const input = document.createElement('input'); input.type = 'range'; input.min = spec.min; input.max = spec.max; input.step = spec.step; input.value = CFG[spec.key];
+    const out = document.createElement('output'); out.textContent = spec.fmt(CFG[spec.key]);
+    input.addEventListener('input', () => { const v = +input.value; CFG[spec.key] = v; out.textContent = spec.fmt(v); if (spec.apply) spec.apply(v); });
+    row.append(lab, input, out); sl.appendChild(row);
+    sliderEls[spec.key] = { input, out, spec };
+  }
+  const tg = document.getElementById('toggles');
+  for (const [key, label] of [['snow', 'Marine snow'], ['caustics', 'Caustics'], ['mesh', 'Show mesh']]) {
+    const el = document.createElement('div'); el.className = 'tg' + (CFG[key] ? ' on' : '');
+    el.innerHTML = `<span>${label}</span><i>${CFG[key] ? 'on' : 'off'}</i>`;
+    el.addEventListener('click', () => { CFG[key] = !CFG[key]; el.classList.toggle('on', CFG[key]); el.querySelector('i').textContent = CFG[key] ? 'on' : 'off'; });
+    tg.appendChild(el);
+  }
+  const bt = document.getElementById('btns');
+  const mk = (label, fn, id) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = label; if (id) b.id = id; b.addEventListener('click', fn); bt.appendChild(b); };
+  mk('Spawn', () => { spawn(rr(W * 0.2, W * 0.8), rr(H * 0.2, H * 0.6), { ci: jellySerial }); CFG.count = jellies.length; syncSlider('count'); });
+  mk('Clear', () => { jellies.length = 0; CFG.count = 0; syncSlider('count'); });
+  mk('Randomize', randomize);
+  mk('Pause', togglePause, 'btnPause');
+  mk('Save PNG', savePNG);
+  mk('About', () => { document.getElementById('modal').hidden = false; }, 'btnAbout');
+  document.getElementById('btnAbout').classList.add('about-btn');
+
+  document.getElementById('aboutLink').addEventListener('click', e => { e.preventDefault(); document.getElementById('modal').hidden = false; });
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+  document.getElementById('cardHead').addEventListener('click', () => {
+    if (window.innerWidth > 700) return;
+    const open = document.getElementById('card').classList.toggle('open');
+    document.body.classList.toggle('sheet-open', open);
+  });
+}
+function closeModal() { document.getElementById('modal').hidden = true; }
+
+const fmtInt = v => v.toLocaleString('en-US');
+setInterval(() => {
+  let pts = 0; for (const j of jellies) pts += j.points();
+  document.getElementById('sFps').textContent = Math.round(fpsEma);
+  document.getElementById('sJel').textContent = jellies.length;
+  document.getElementById('sPts').textContent = fmtInt(pts);
+  document.getElementById('sGrid').textContent = `${G.cols}×${G.rows}`;
+  const s = Math.floor(simTime); document.getElementById('sTime').textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}, 250);
+
+/* ---------- boot ---------- */
+window.addEventListener('resize', resize);
+resize();
+if (W < 700) CFG.count = 6;
+paletteCols();
+populate(CFG.count);
+buildUI();
+if (document.fonts && document.fonts.load) document.fonts.load(G.font).then(() => atlasReset()).catch(() => {});
+requestAnimationFrame(t => { lastT = t; frame(t); });
+
+// test hooks (harmless in production)
+window.__JT = {
+  get fps() { return fpsEma; }, get frameMs() { return frameMs; }, PROF, get jellies() { return jellies; }, CFG, G, setCount, resetTank, spawn, setPalette, setRamp, step: () => step(DT), get simTime() { return simTime; },
+};
+})();
+</script>
+</body>
+</html>
