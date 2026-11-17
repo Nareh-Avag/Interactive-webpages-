@@ -178,14 +178,14 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 
 /* ---------- config ---------- */
-const CFG = { flavour: 'cherry', firmness: 0.55, damping: 0.45, thickness: 0.55, clearcoat: 0.6, sugar: 0, gravity: 9.8, lattice: false, wireframe: false, slow: false, substeps: 12 };
+const CFG = { flavour: 'cherry', firmness: 0.55, damping: 0.36, thickness: 0.55, clearcoat: 0.6, sugar: 0, gravity: 9.8, lattice: false, wireframe: false, slow: false, substeps: 12 };
 const FLAVOURS = {
   cherry:   { name: 'Cherry',    color: '#d6273b', atten: '#b0101f' },
   lime:     { name: 'Lime',      color: '#78c43a', atten: '#3f8f14' },
   lemon:    { name: 'Lemon',     color: '#f3d034', atten: '#d9a800' },
   orange:   { name: 'Orange',    color: '#f28a2a', atten: '#d85f00' },
   blueRazz: { name: 'Blue Razz', color: '#2f84e6', atten: '#0d4fb8' },
-  clear:    { name: 'Clear',     color: '#f6f2ea', atten: '#e6e0d6' },
+  clear:    { name: 'Clear',     color: '#f3ead8', atten: '#c9b89a' },
 };
 
 /* ---------- SDF bear ---------- */
@@ -203,22 +203,40 @@ function sdEllipsoid(px, py, pz, cx, cy, cz, rx, ry, rz) {
   return k1 > 0 ? k0 * (k0 - 1) / k1 : -Math.min(rx, ry, rz);
 }
 function smin(a, b, k) { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; }
-// bear frame: feet at y≈0, ears at y≈1.85, width ≈ ±0.72, flattened in z
+// rounded cone: a capsule whose radius grows from rb at point b to ra at point a (vertical only)
+function sdRoundCone(px, py, pz, cx, y1, y2, r1, r2) {
+  // y1 < y2, r1 at the bottom, r2 at the top; exact for a vertical axis
+  const qx = Math.sqrt((px - cx) * (px - cx) + pz * pz), qy = py - y1, h = y2 - y1, b = (r1 - r2) / h, a = Math.sqrt(1 - b * b);
+  const k = qx * (-b) + qy * a; // dot(q, (-b, a))
+  if (k < 0) return Math.sqrt(qx * qx + qy * qy) - r1;
+  if (k > a * h) return Math.sqrt(qx * qx + (qy - h) * (qy - h)) - r2;
+  return qx * a + qy * b - r1;
+}
+// bear frame: feet at y=0, ear tops near y=2.0, width about +-0.8 (arms), flattened front-to-back.
+// Classic seated gummy: trapezoid torso wide at the seat, round head on a pinched neck, two ear balls,
+// a snout bump, arms held out and slightly raised, legs stubbed forward. Small smooth-min radii keep
+// every part readable instead of melting into one blob.
 function bearSDF(x, y, z) {
-  z = z / 0.8;
-  let d = sdCapsule(x, y, z, 0, 0.55, 0, 0, 1.02, 0, 0.42);
-  d = smin(d, sdSphere(x, y, z, 0, 0.74, 0.1, 0.44), 0.18);
-  d = smin(d, sdSphere(x, y, z, 0, 1.42, 0, 0.37), 0.14);
-  d = smin(d, sdSphere(x, y, z, 0, 1.33, 0.3, 0.17), 0.08);
-  d = smin(d, sdEllipsoid(x, y, z, -0.3, 1.7, -0.02, 0.16, 0.16, 0.1), 0.07);
-  d = smin(d, sdEllipsoid(x, y, z, 0.3, 1.7, -0.02, 0.16, 0.16, 0.1), 0.07);
-  d = smin(d, sdCapsule(x, y, z, -0.36, 1.0, 0.04, -0.58, 0.68, 0.2, 0.15), 0.1);
-  d = smin(d, sdCapsule(x, y, z, 0.36, 1.0, 0.04, 0.58, 0.68, 0.2, 0.15), 0.1);
-  d = smin(d, sdCapsule(x, y, z, -0.22, 0.5, 0.03, -0.33, 0.19, 0.1, 0.19), 0.1);
-  d = smin(d, sdCapsule(x, y, z, 0.22, 0.5, 0.03, 0.33, 0.19, 0.1, 0.19), 0.1);
+  const zz = z / 0.8; // front-to-back flattening (positions below are in the stretched space)
+  // torso: rounded trapezoid, seat radius .5 at y=.5 tapering to .32 at y=1.02
+  let d = sdRoundCone(x, y, zz, 0, 0.5, 1.02, 0.5, 0.32);
+  // head: a separate ball; the neck pinch is where the two surfaces meet (r ~.2 vs .38 head / .47 seat)
+  d = smin(d, sdSphere(x, y, zz, 0, 1.57, 0.0, 0.38), 0.045);
+  // snout: a low bump on the lower half of the face
+  d = smin(d, sdEllipsoid(x, y, zz, 0, 1.49, 0.36, 0.19, 0.14, 0.17), 0.04);
+  // ears: two balls sitting on top of the head, clearly proud of the skull
+  d = smin(d, sdSphere(x, y, zz, -0.31, 1.87, -0.02, 0.165), 0.035);
+  d = smin(d, sdSphere(x, y, zz, 0.31, 1.87, -0.02, 0.165), 0.035);
+  // arms: out from the shoulders and raised a little, rounded paws
+  d = smin(d, sdCapsule(x, y, zz, -0.28, 0.98, 0.02, -0.68, 1.14, 0.1, 0.15), 0.05);
+  d = smin(d, sdCapsule(x, y, zz, 0.28, 0.98, 0.02, 0.68, 1.14, 0.1, 0.15), 0.05);
+  // legs: stubbed forward and slightly splayed, flat on the floor
+  d = smin(d, sdCapsule(x, y, zz, -0.25, 0.32, 0.12, -0.31, 0.2, 0.6, 0.19), 0.06);
+  d = smin(d, sdCapsule(x, y, zz, 0.25, 0.32, 0.12, 0.31, 0.2, 0.6, 0.19), 0.06);
   return d * 0.8;
 }
-const SDF_Y0 = 0.92; // bear-frame y that maps to MC-space 0
+const SDF_S = 0.88;  // bear space -> marching-cubes space scale so the ears clear the grid border
+const SDF_Y0 = 0.97; // bear-frame y that maps to MC-space 0
 
 function buildBearGeometry(res) {
   const mc = new MarchingCubes(res, new THREE.MeshBasicMaterial(), false, false, 120000);
@@ -226,7 +244,7 @@ function buildBearGeometry(res) {
   const size = res, half = size / 2, f = mc.field;
   for (let z = 0; z < size; z++) for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const px = (x - half) / (half - 1), py = (y - half) / (half - 1), pz = (z - half) / (half - 1);
-    f[z * size * size + y * size + x] = -bearSDF(px, py + SDF_Y0, pz);
+    f[z * size * size + y * size + x] = -bearSDF(px / SDF_S, py / SDF_S + SDF_Y0, pz / SDF_S);
   }
   mc.update();
   const n = mc.count;
@@ -241,9 +259,10 @@ function buildBearGeometry(res) {
   for (let i = 0; i < p.count; i++) { const dot = p.getX(i) * nm.getX(i) + (p.getY(i) - cy) * nm.getY(i) + p.getZ(i) * nm.getZ(i); agree += dot > 0 ? 1 : -1; }
   if (agree < 0) { const idx = g.index.array; for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; } }
   // Taubin smoothing (shrink / inflate) to kill the marching-cubes staircase
-  taubin(g, 6, 0.55, -0.58);
+  taubin(g, 3, 0.5, -0.53);
   // to bear frame (feet on floor)
   const a = g.attributes.position.array; let minY = 1e9;
+  for (let i = 0; i < a.length; i++) a[i] /= SDF_S;
   for (let i = 1; i < a.length; i += 3) { a[i] += SDF_Y0; if (a[i] < minY) minY = a[i]; }
   for (let i = 1; i < a.length; i += 3) a[i] -= minY;
   g.computeVertexNormals();
@@ -509,7 +528,7 @@ renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.VSMShadowMap;
 RectAreaLightUniformsLib.init();
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#efe9e0');
+scene.background = new THREE.Color('#e9e2d8');
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
 camera.position.set(2.9, 1.7, 4.6);
 const controls = new OrbitControls(camera, canvas);
@@ -530,9 +549,9 @@ function makeCyc() {
   const W = 16, cols = 2;
   const pos = [], nrm = [], idx = [];
   for (let r = 0; r < prof.length; r++) for (let c = 0; c <= cols; c++) { pos.push(-W + c * (2 * W / cols), prof[r][1], prof[r][0]); }
-  for (let r = 0; r < prof.length - 1; r++) for (let c = 0; c < cols; c++) { const a = r * (cols + 1) + c, b = a + 1, cc = a + cols + 1, d = cc + 1; idx.push(a, cc, b, b, cc, d); }
+  for (let r = 0; r < prof.length - 1; r++) for (let c = 0; c < cols; c++) { const a = r * (cols + 1) + c, b = a + 1, cc = a + cols + 1, d = cc + 1; idx.push(a, b, cc, b, d, cc); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  const m = new THREE.MeshStandardMaterial({ color: '#ece6dc', roughness: 1, metalness: 0, envMapIntensity: 0.55 });
+  const m = new THREE.MeshStandardMaterial({ color: '#d9d0c2', roughness: 1, metalness: 0, envMapIntensity: 0.32 });
   const mesh = new THREE.Mesh(g, m); mesh.receiveShadow = true; return mesh;
 }
 scene.add(makeCyc());
@@ -540,7 +559,9 @@ scene.add(makeCyc());
 const key = new THREE.RectAreaLight('#fff4e4', 3.2, 3.2, 3.2); key.position.set(2.8, 4.2, 3.2); key.lookAt(0, 0.8, 0); scene.add(key);
 const fill = new THREE.RectAreaLight('#e9f0ff', 2.0, 4, 3); fill.position.set(-3.6, 2.4, 2.2); fill.lookAt(0, 0.8, 0); scene.add(fill);
 const rim = new THREE.RectAreaLight('#ffffff', 1.6, 3, 2); rim.position.set(-1.5, 3.2, -3.4); rim.lookAt(0, 0.9, 0); scene.add(rim);
-const sun = new THREE.DirectionalLight('#fff7ee', 2.8); sun.position.set(2.2, 5.5, 2.6); sun.castShadow = true;
+// backlight: a hot patch on the cyc wall directly behind the bear, seen through the body by the transmission pass
+const back = new THREE.SpotLight('#fff3df', 90, 0, 0.42, 1, 1.3); back.position.set(0, 2.6, -2.6); back.target.position.set(0, 1.3, -6.2); scene.add(back); scene.add(back.target);
+const sun = new THREE.DirectionalLight('#fff7ee', 2.3); sun.position.set(2.2, 5.5, 2.6); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.near = 1; sun.shadow.camera.far = 14;
 sun.shadow.camera.left = -4; sun.shadow.camera.right = 4; sun.shadow.camera.top = 4; sun.shadow.camera.bottom = -4;
 sun.shadow.radius = 9; sun.shadow.blurSamples = 20; sun.shadow.bias = -0.0005;
@@ -566,25 +587,25 @@ const grainNormal = makeGrain(512);
 
 /* ---------- bear ---------- */
 const loading = document.getElementById('loading');
-const bearGeo = buildBearGeometry(46);
+const bearGeo = buildBearGeometry(54);
 const restPos = bearGeo.attributes.position.array.slice();
 const body = new SoftBody(bearGeo, 8, 10, 5);
 const mat = new THREE.MeshPhysicalMaterial({
-  color: '#ffffff', roughness: 0.22, metalness: 0, ior: 1.4, transmission: 0.92, thickness: 1.8,
-  attenuationColor: new THREE.Color('#b0101f'), attenuationDistance: 0.9,
+  color: '#ffffff', roughness: 0.25, metalness: 0, ior: 1.4, transmission: 0.92, thickness: 2.0,
+  attenuationColor: new THREE.Color('#b0101f'), attenuationDistance: 0.55,
   clearcoat: 0.6, clearcoatRoughness: 0.18, sheen: 0.12, sheenColor: new THREE.Color('#ffffff'), sheenRoughness: 0.6,
   envMapIntensity: 1.0, side: THREE.FrontSide,
 });
 // gentle wrap/subsurface term so the thin parts glow instead of going flat
 mat.onBeforeCompile = (shader) => {
-  shader.uniforms.uWrap = { value: 0.16 }; shader.uniforms.uSSSColor = { value: new THREE.Color('#ff6b7a') };
+  shader.uniforms.uWrap = { value: 0.16 }; shader.uniforms.uBack = { value: 0.9 }; shader.uniforms.uSSSColor = { value: new THREE.Color('#ff6b7a') };
   mat.userData.shader = shader;
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nattribute float aThick; varying float vThick;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvThick = aThick;');
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', '#include <common>\nuniform float uWrap; uniform vec3 uSSSColor; varying float vThick;')
-    .replace('material.thickness = thickness;', 'material.thickness = thickness * vThick;')
+    .replace('#include <common>', '#include <common>\nuniform float uWrap; uniform float uBack; uniform vec3 uSSSColor; varying float vThick;')
+    .replace('#include <transmission_fragment>', THREE.ShaderChunk.transmission_fragment.replace('material.thickness = thickness;', 'material.thickness = thickness * vThick;'))
     .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
       {
         vec3 vdir = normalize(vViewPosition);
@@ -592,6 +613,8 @@ mat.onBeforeCompile = (shader) => {
         // thin parts (ears, paws) glow a little: wrap light scaled by inverse thickness
         float thin = 1.0 - clamp(vThick, 0.0, 1.0);
         reflectedLight.indirectDiffuse += uSSSColor * uWrap * (0.3 + 0.7 * fres) * (0.4 + thin) * diffuseColor.rgb;
+        // back-scatter from the backlight: thin parts (ears, paws, edges) light up, the thick belly stays deep
+        reflectedLight.indirectDiffuse += uSSSColor * uBack * pow(thin, 1.7) * (0.5 + 0.5 * fres);
       }`);
   mat.userData.thickOK = shader.fragmentShader.includes('thickness * vThick');
 };
@@ -616,15 +639,15 @@ function applyFlavour(key) {
   CFG.flavour = key; const f = FLAVOURS[key];
   const c = new THREE.Color(f.color);
   mat.attenuationColor.set(f.atten);
-  mat.color.copy(c).lerp(new THREE.Color('#ffffff'), key === 'clear' ? 0.85 : 0.72);
-  mat.transmission = key === 'clear' ? 0.97 : 0.92;
+  mat.color.copy(c).lerp(new THREE.Color('#ffffff'), key === 'clear' ? 0.85 : 0.55);
+  mat.transmission = key === 'clear' ? 0.96 : 0.92; mat.ior = key === 'clear' ? 1.48 : 1.4;
   if (mat.userData.shader) mat.userData.shader.uniforms.uSSSColor.value.copy(c).lerp(new THREE.Color('#ffffff'), 0.35);
   document.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.key === key));
   document.getElementById('colName').textContent = f.name;
   applyMaterial();
 }
 function applyMaterial() {
-  mat.attenuationDistance = lerp(2.6, 0.3, CFG.thickness) * (CFG.flavour === 'clear' ? 2.5 : 1);
+  mat.attenuationDistance = lerp(1.8, 0.2, CFG.thickness) * (CFG.flavour === 'clear' ? 1.6 : 1);
   mat.clearcoat = CFG.clearcoat;
   const s = CFG.sugar;
   mat.normalMap = s > 0.01 ? grainNormal : null;
@@ -640,7 +663,7 @@ function simParams() {
     gravity: CFG.gravity,
     damping: lerp(0.6, 9, CFG.damping),
     compliance: Math.pow(10, lerp(-3.9, -6.2, CFG.firmness)),
-    volCompliance: Math.pow(10, lerp(-4.5, -7, CFG.firmness)),
+    volCompliance: Math.pow(10, lerp(-5.4, -7.6, CFG.firmness)),
   };
 }
 
@@ -702,7 +725,7 @@ window.addEventListener('keydown', e => {
 
 /* ---------- actions ---------- */
 let press = null; // { t }
-function drop() { body.reset(2.4, 2.2); }
+function drop() { body.reset(2.4, 1.1); }
 function resetBear() { body.reset(0, 0); press = null; body.pressY = Infinity; }
 function throwBear() { body.addVelocity(0, 2.6, -9); }
 function squash() { press = { t: 0 }; }
@@ -710,9 +733,9 @@ function stepPress(dt) {
   if (!press) { body.pressY = Infinity; return; }
   press.t += dt; const t = press.t;
   let y;
-  if (t < 0.55) y = lerp(3.2, 0.42, t / 0.55);               // descend fast
-  else if (t < 1.0) y = 0.42 - Math.sin((t - 0.55) / 0.45 * Math.PI) * 0.06; // hold with a little extra push
-  else if (t < 1.8) y = lerp(0.42, 3.2, (t - 1.0) / 0.8);    // lift
+  if (t < 0.55) y = lerp(3.2, 1.0, t / 0.55);               // descend fast
+  else if (t < 1.0) y = 1.0 - Math.sin((t - 0.55) / 0.45 * Math.PI) * 0.12; // hold with a little extra push
+  else if (t < 1.8) y = lerp(1.0, 3.2, (t - 1.0) / 0.8);    // lift
   else { press = null; y = Infinity; }
   body.pressY = y;
 }
@@ -766,6 +789,10 @@ const FIXED = 1 / 60;
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  // narrow screens: back the camera off so the whole bear fits under the masthead
+  const want = 5.6 * clamp(1.15 / camera.aspect, 1, 2.4);
+  const off = camera.position.clone().sub(controls.target); off.setLength(want); camera.position.copy(controls.target).add(off);
+  controls.minDistance = Math.min(controls.minDistance, want); controls.maxDistance = Math.max(9, want);
 }
 window.addEventListener('resize', resize); resize();
 
@@ -803,7 +830,7 @@ body.reset(0, 0);
 loading.classList.add('gone');
 requestAnimationFrame(t => { last = t; frame(t); });
 
-window.__GB = { get thickOK() { return mat.userData.thickOK; }, body, CFG, bear, camera, controls, drop, throwBear, squash, resetBear, applyFlavour, get fps() { return fpsEma; }, get ms() { return msEma; }, verts: bearGeo.attributes.position.count, tris: bearGeo.index.count / 3, toggle, setView(az, el, dist) { const sph = new THREE.Spherical(dist, el, az); camera.position.copy(controls.target).add(new V().setFromSpherical(sph)); camera.lookAt(controls.target); } };
+window.__GB = { renderer, scene, mat, THREE, get thickOK() { return mat.userData.thickOK; }, body, CFG, bear, camera, controls, drop, throwBear, squash, resetBear, applyFlavour, get fps() { return fpsEma; }, get ms() { return msEma; }, verts: bearGeo.attributes.position.count, tris: bearGeo.index.count / 3, toggle, setView(az, el, dist) { const sph = new THREE.Spherical(dist, el, az); camera.position.copy(controls.target).add(new V().setFromSpherical(sph)); camera.lookAt(controls.target); } };
 </script>
 </body>
 </html>

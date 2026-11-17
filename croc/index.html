@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crocodile Jelly</title>
+<meta name="description" content="Material Studies No. 069 — a life-size crocodile cast in two layers of jelly, simulated as a tetrahedral soft body with XPBD shape matching and rendered with hand-written refraction shaders in three.js.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#e2dfda; --paper:#eceae5; --ink:#1d1b18; --ink-2:#4a4640; --ink-3:#8a847b; --hair:rgba(29,27,24,.16);
+    --acc:#5f9e30; --mono:"Space Mono",ui-monospace,Menlo,Consolas,monospace; --serif:"Instrument Serif",Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box} html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:11px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+  #stage{position:fixed;inset:0;touch-action:none}
+  canvas{display:block;width:100%;height:100%}
+  .label{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3);font-weight:400}
+  .label b{color:var(--ink-2);font-weight:400} .label i{font-style:normal;color:var(--acc)} .label .sep{margin:0 .5em}
+
+  #ui{position:fixed;inset:0;pointer-events:none;z-index:3}
+  #ui > *{pointer-events:auto}
+  body.hide-ui #ui{opacity:0;pointer-events:none}
+
+  .masthead{position:absolute;left:36px;top:30px;max-width:440px}
+  .masthead h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:76px;line-height:.92;letter-spacing:-.015em;margin:16px 0 16px -3px}
+  .masthead p{font-family:var(--serif);font-style:italic;font-size:18px;line-height:1.35;color:var(--ink-2);max-width:330px;margin:0}
+
+  .pill{position:absolute;right:36px;top:30px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--hair);padding:6px 11px;background:rgba(236,234,229,.85)}
+  .pill i{width:6px;height:6px;border-radius:50%;background:var(--acc);display:inline-block;animation:blink 2.2s ease-in-out infinite}
+  @keyframes blink{50%{opacity:.25}}
+
+  .panel{position:absolute;right:36px;top:76px;width:272px;border-top:1px solid var(--hair);background:rgba(236,234,229,.88);padding:0 0 4px}
+  .panel-h{display:flex;justify-content:space-between;align-items:baseline;padding:12px 14px 0}
+  .sec{border-bottom:1px solid var(--hair);padding:12px 14px 14px}
+  .sec:last-child{border-bottom:0}
+  .ro{display:grid;grid-template-columns:1fr auto;row-gap:5px;column-gap:16px}
+  .ro b{font-weight:400;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ro b small{color:var(--ink-3);font-size:10px;letter-spacing:.1em;margin-left:4px}
+  .btns{display:flex;flex-wrap:wrap;gap:4px 18px}
+  .btn{background:none;border:0;padding:2px 0;cursor:pointer;color:var(--ink);font:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;border-bottom:1px solid var(--ink);line-height:1.6}
+  .btn:hover{color:var(--acc);border-color:var(--acc)} .btn.on{color:var(--acc);border-color:var(--acc)}
+  .row{display:grid;grid-template-columns:92px 1fr 40px;align-items:center;gap:10px;margin:7px 0}
+  .row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:10px;letter-spacing:.1em}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;background:transparent;margin:0;cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--hair)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;margin-top:-4px;background:var(--paper);border:1px solid var(--ink)}
+  input[type=range]::-moz-range-track{height:1px;background:var(--hair)} input[type=range]::-moz-range-thumb{width:9px;height:9px;background:var(--paper);border:1px solid var(--ink);border-radius:0}
+  .chk{display:flex;justify-content:space-between;align-items:center;margin:6px 0;cursor:pointer;user-select:none}
+  .chk input{display:none} .chk span.v{color:var(--ink-3)} .chk input:checked ~ span.v{color:var(--acc)}
+  .sw{display:flex;gap:10px;margin-top:8px}
+  .sw button{width:22px;height:22px;border-radius:50%;border:1px solid rgba(29,27,24,.25);cursor:pointer;padding:0;position:relative;box-shadow:inset 0 -3px 5px rgba(0,0,0,.18),inset 0 3px 4px rgba(255,255,255,.55)}
+  .sw button.on::after{content:"";position:absolute;inset:-5px;border:1px solid var(--ink);border-radius:50%}
+
+  .colophon{position:absolute;left:36px;bottom:30px;width:380px}
+  details{border-top:1px solid var(--hair);padding-top:10px}
+  summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:baseline}
+  summary::-webkit-details-marker{display:none}
+  summary .tog::after{content:"+"} details[open] summary .tog::after{content:"–"}
+  details p{font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.35;color:var(--ink-2);margin:10px 0 0;max-width:360px}
+  .stats{margin-top:12px;border-top:1px solid var(--hair);padding-top:10px;display:flex;flex-wrap:wrap;column-gap:18px;row-gap:3px;white-space:nowrap}
+  .stats b{color:var(--ink-2);font-weight:400;font-variant-numeric:tabular-nums}
+
+  .hint{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);white-space:nowrap;transition:opacity 1s} .hint.gone{opacity:0}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:5;background:var(--bg);transition:opacity .6s}
+  #loading.gone{opacity:0;pointer-events:none}
+  #fallback{display:none;position:fixed;inset:0;z-index:6;background:var(--bg);align-items:center;justify-content:center;padding:36px}
+  #fallback div{max-width:420px} #fallback p{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ink-2)}
+
+  @media (max-width:1100px){ .hint{display:none} .colophon{width:320px} .masthead h1{font-size:62px} }
+  @media (max-width:860px){
+    body{overflow:auto;height:auto}
+    #stage{position:relative;height:58vh;inset:auto}
+    #ui{position:static;display:flex;flex-direction:column;gap:18px;padding:18px 20px 40px}
+    .masthead,.pill,.panel,.colophon{position:static;width:auto;max-width:none;background:none}
+    .masthead h1{font-size:48px} .masthead p{font-size:15px}
+    .pill{align-self:flex-start;background:rgba(236,234,229,.85)}
+    .panel{border-top:1px solid var(--hair)}
+    .hint{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){ .pill i{animation:none} }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+
+<div id="ui">
+  <div class="masthead">
+    <div class="label">Material Studies <span class="sep">/</span> No. 069 <span class="sep">/</span> <i>Soft body</i></div>
+    <h1>Crocodile Jelly.</h1>
+    <p>Low and long and patient, in moss-green jelly, basking with its jaws open on sugar.</p>
+  </div>
+
+  <div class="pill label"><i></i>THREE.JS · LIVE</div>
+
+  <div class="panel">
+    <div class="panel-h"><span class="label">The specimen</span><span class="label">fig. 69</span></div>
+    <div class="sec ro label">
+      <span>Mass</span><b id="roMass">—<small>kg</small></b>
+      <span>Length</span><b id="roLen">—<small>m</small></b>
+      <span>Gape</span><b id="roGape">—<small>deg</small></b>
+      <span>Fish swallowed</span><b id="roFish">0</b>
+    </div>
+    <div class="sec">
+      <div class="btns">
+        <button class="btn" id="bFeed">Feed</button><button class="btn" id="bSnap">Snap</button><button class="btn" id="bThrash">Thrash</button><button class="btn" id="bReset">Reset</button><button class="btn" id="bPause">Pause</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="row label"><span>Firmness</span><input type="range" id="sFirm" min="0" max="1" step="0.01" value="0.55"><output id="oFirm">0.55</output></div>
+      <div class="row label"><span>Int. damping</span><input type="range" id="sDamp" min="0" max="1" step="0.01" value="0.35"><output id="oDamp">0.35</output></div>
+      <label class="chk label"><span>¼ speed</span><input type="checkbox" id="cSlow"><span class="v">off</span></label>
+      <label class="chk label"><span>Show mesh</span><input type="checkbox" id="cMesh"><span class="v">off</span></label>
+    </div>
+    <div class="sec">
+      <div class="label">Colourway <span class="sep">/</span> <b id="swName">Moss</b></div>
+      <div class="sw" id="swatches"></div>
+    </div>
+  </div>
+
+  <div class="colophon">
+    <details id="notes">
+      <summary class="label"><span>Inside the experiment</span><span class="tog"></span></summary>
+      <p>The crocodile is a signed distance field: a boxy superellipse section swept along a curved spine, with capsule legs, a crest of triangular plates, keeled scutes and an upper head swung open about the corner of the mouth. Surface nets turn it into two meshes, the clear jelly and a cream core.</p>
+      <p>Underneath, a hex lattice split into five tetrahedra per cell is simulated with XPBD shape matching at 60 Hz, ten substeps per frame. Muscles are rest shapes rewritten each frame: the jaw hinges about the mouth corner and a travelling wave bends the spine. Rendering is a shadow map, a back-face thickness pass and refraction through the front faces with Beer–Lambert absorption.</p>
+    </details>
+    <div class="stats label"><span><b id="stNodes">—</b> nodes</span><span><b id="stTets">—</b> tets</span><span><b id="stVerts">—</b> verts</span><span><b id="stFps">—</b> fps</span><span><b id="stMs">—</b> ms</span></div>
+  </div>
+
+  <div class="hint label" id="hint">Drag the jelly · scroll while holding to twist · Feed tosses fish at the mouth</div>
+</div>
+
+<div id="loading"><div class="label">Casting the specimen <span class="sep">·</span> <b id="loadStep">signed distance field</b></div></div>
+<div id="fallback"><div><div class="label">Crocodile Jelly</div><p>This study needs WebGL 2 and a GPU. Your browser could not create a WebGL 2 context, so the specimen could not be cast.</p></div></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const canvas = $('c');
+const gl2 = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'high-performance' });
+if (!gl2) { $('fallback').style.display = 'flex'; $('loading').classList.add('gone'); throw new Error('WebGL2 unavailable'); }
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const mix = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const V3 = THREE.Vector3;
+
+/* ======================================================================
+   1. THE CROCODILE AS A SIGNED DISTANCE FIELD (rest pose, mouth 17° open)
+   Units: 1 unit ≈ 1.35 m. The table is y = 0, the animal lies along +x
+   with the snout at +x, lateral is z.
+   ====================================================================== */
+const L0 = -1.55, L1 = 1.55, LEN = L1 - L0;
+const YM = 0.065;                       // mouth line
+const GAPE0 = 17 * Math.PI / 180;       // the pose the geometry is cast in
+const XH = L0 + 0.80 * LEN;             // corner of the mouth (jaw hinge)
+
+// Catmull–Rom through keyed samples: pts[i] = [key, v1, v2, ...]
+function catmull(pts, x, col) {
+  const n = pts.length; if (x <= pts[0][0]) return pts[0][col]; if (x >= pts[n - 1][0]) return pts[n - 1][col];
+  let i = 0; while (i < n - 2 && pts[i + 1][0] <= x) i++;
+  const p0 = pts[Math.max(i - 1, 0)][col], p1 = pts[i][col], p2 = pts[i + 1][col], p3 = pts[Math.min(i + 2, n - 1)][col];
+  const u = (x - pts[i][0]) / (pts[i + 1][0] - pts[i][0]), u2 = u * u, u3 = u2 * u;
+  return 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u2 + (-p0 + 3 * p1 - 3 * p2 + p3) * u3);
+}
+// spine: a gentle S in plan view (x → z)
+const SP = [[-1.55, -0.10], [-1.10, -0.05], [-0.60, 0.01], [-0.10, 0.04], [0.40, 0.03], [0.80, 0.00], [1.10, -0.02], [1.55, -0.05]];
+// section profile along t ∈ [0,1]: [t, half-width, top height, superellipse exponent]
+const PK = [
+  [0.00, 0.012, 0.035, 2.2], [0.08, 0.055, 0.150, 2.2], [0.20, 0.095, 0.250, 2.3], [0.32, 0.165, 0.245, 2.7],
+  [0.44, 0.270, 0.220, 3.2], [0.56, 0.290, 0.220, 3.2], [0.66, 0.245, 0.205, 3.0], [0.72, 0.170, 0.170, 2.8],
+  [0.78, 0.205, 0.170, 3.4], [0.85, 0.200, 0.150, 3.6], [0.91, 0.150, 0.120, 3.2], [0.96, 0.110, 0.100, 2.8], [1.00, 0.070, 0.080, 2.4]];
+// tables for speed
+const TN = 1024, TX0 = L0 - 0.4, TX1 = L1 + 0.4, TDX = (TX1 - TX0) / (TN - 1);
+const ZT = new Float32Array(TN), ST = new Float32Array(TN), WT = new Float32Array(TN), TOPT = new Float32Array(TN), NT = new Float32Array(TN);
+(() => {
+  let s = 0, pz = catmull(SP, TX0, 1);
+  for (let i = 0; i < TN; i++) {
+    const x = TX0 + i * TDX, z = catmull(SP, x, 1); ZT[i] = z;
+    if (i) s += Math.hypot(TDX, z - pz); ST[i] = s; pz = z;
+    const t = clamp((x - L0) / LEN, 0, 1); WT[i] = catmull(PK, t, 1); TOPT[i] = catmull(PK, t, 2); NT[i] = catmull(PK, t, 3);
+  }
+  const s0 = ST[Math.round((L0 - TX0) / TDX)]; for (let i = 0; i < TN; i++) ST[i] -= s0; // s = 0 at the tail tip
+})();
+function tab(T, x) { const f = clamp((x - TX0) / TDX, 0, TN - 1.001), i = f | 0, u = f - i; return T[i] + (T[i + 1] - T[i]) * u; }
+const zcOf = x => tab(ZT, x), sOf = x => tab(ST, x), wOf = x => tab(WT, x), topOf = x => tab(TOPT, x), nOf = x => tab(NT, x);
+const S_TOTAL = sOf(L1);
+
+/* --- primitives --- */
+function sdSphere(px, py, pz, cx, cy, cz, r) { const dx = px - cx, dy = py - cy, dz = pz - cz; return Math.sqrt(dx * dx + dy * dy + dz * dz) - r; }
+function sdEllipsoid(px, py, pz, cx, cy, cz, rx, ry, rz) {
+  const x = (px - cx) / rx, y = (py - cy) / ry, z = (pz - cz) / rz;
+  const k0 = Math.sqrt(x * x + y * y + z * z), k1 = Math.sqrt(x * x / (rx * rx) + y * y / (ry * ry) + z * z / (rz * rz));
+  return k1 > 1e-9 ? k0 * (k0 - 1) / k1 : -Math.min(rx, ry, rz);
+}
+// tapered capsule (iq's round cone) from a (radius r1) to b (radius r2)
+function sdRoundCone(px, py, pz, a, b, r1, r2) {
+  const bax = b[0] - a[0], bay = b[1] - a[1], baz = b[2] - a[2], l2 = bax * bax + bay * bay + baz * baz, rr = r1 - r2, a2 = l2 - rr * rr, il2 = 1 / l2;
+  const pax = px - a[0], pay = py - a[1], paz = pz - a[2], y = pax * bax + pay * bay + paz * baz, z = y - l2;
+  const xx = pax * l2 - bax * y, xy = pay * l2 - bay * y, xz = paz * l2 - baz * y, x2 = xx * xx + xy * xy + xz * xz, y2 = y * y * l2, z2 = z * z * l2;
+  const k = Math.sign(rr) * rr * rr * x2;
+  if (Math.sign(z) * a2 * z2 > k) return Math.sqrt(x2 + z2) * il2 - r2;
+  if (Math.sign(y) * a2 * y2 < k) return Math.sqrt(x2 + y2) * il2 - r1;
+  return (Math.sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;
+}
+function sdTri(px, py, ax, ay, bx, by, cx, cy) {
+  const e0x = bx - ax, e0y = by - ay, e1x = cx - bx, e1y = cy - by, e2x = ax - cx, e2y = ay - cy;
+  const v0x = px - ax, v0y = py - ay, v1x = px - bx, v1y = py - by, v2x = px - cx, v2y = py - cy;
+  const s = Math.sign(e0x * e2y - e0y * e2x);
+  let t = clamp((v0x * e0x + v0y * e0y) / (e0x * e0x + e0y * e0y), 0, 1), qx = v0x - e0x * t, qy = v0y - e0y * t, dx = qx * qx + qy * qy, dy = s * (v0x * e0y - v0y * e0x);
+  t = clamp((v1x * e1x + v1y * e1y) / (e1x * e1x + e1y * e1y), 0, 1); qx = v1x - e1x * t; qy = v1y - e1y * t; let d2 = qx * qx + qy * qy, s2 = s * (v1x * e1y - v1y * e1x); if (d2 < dx) dx = d2; if (s2 < dy) dy = s2;
+  t = clamp((v2x * e2x + v2y * e2y) / (e2x * e2x + e2y * e2y), 0, 1); qx = v2x - e2x * t; qy = v2y - e2y * t; d2 = qx * qx + qy * qy; s2 = s * (v2x * e2y - v2y * e2x); if (d2 < dx) dx = d2; if (s2 < dy) dy = s2;
+  return -Math.sqrt(dx) * Math.sign(dy);
+}
+function smin(a, b, k) { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; }
+// superellipse section |u/w|^n + |v/h|^n = 1, approximate distance
+function sdSection(u, v, w, h, n) {
+  const qx = Math.abs(u) / w, qy = Math.abs(v) / h;
+  const m = Math.pow(Math.pow(qx, n) + Math.pow(qy, n), 1 / n);
+  return (m - 1) * Math.min(w, h);
+}
+
+const BOTTOM = -0.03; // the section dips below the table; the floor cut flattens the belly
+function swept(x, y, z) {
+  const t = (x - L0) / LEN, w = wOf(x), top = topOf(x), n = nOf(x), zc = zcOf(x);
+  const h = (top - BOTTOM) * 0.5, cy = (top + BOTTOM) * 0.5;
+  let d = sdSection(z - zc, y - cy, w, h, n);
+  if (t < 0) d = Math.max(d, L0 - x); else if (t > 1) d = Math.max(d, x - L1);
+  return d;
+}
+// keeled scutes as a displacement of the back (t along, s arc length, un lateral ∈[-1,1], vn vertical ∈[-1,1])
+function scuteBump(t, s, un, vn) {
+  if (vn < 0.15) return 0; let b = 0; const au = Math.abs(un);
+  if (t > 0.33 && t < 0.76) {
+    const P = 0.095, fa = Math.abs(((s / P) % 1 + 1) % 1 - 0.5) * 2, along = Math.max(0, 1 - fa * 1.25);
+    const across = Math.max(0, 1 - Math.min(Math.abs(au - 0.22), Math.abs(au - 0.62)) / 0.14);
+    b = 0.014 * along * across * sstep(0.33, 0.38, t) * (1 - sstep(0.72, 0.76, t));
+  }
+  if (t > 0.735 && t < 0.80) { // the bigger pair on the nape
+    const across = Math.max(0, 1 - Math.abs(au - 0.28) / 0.2), along = Math.max(0, 1 - Math.abs((t - 0.7675) / 0.0325));
+    b = Math.max(b, 0.03 * along * across);
+  }
+  return b * sstep(0.15, 0.5, vn);
+}
+// tail crest: [x, z offset, height, base y, half thickness]
+const PLATES = [];
+(() => {
+  const sp = 0.078; let x = L0 + 0.43 * LEN;
+  for (; x > L0 + 0.235 * LEN; x -= sp) { const t = (x - L0) / LEN, hh = mix(0.07, 0.095, (t - 0.235) / 0.2); PLATES.push([x, 0.05, hh, topOf(x) - 0.012, 0.012], [x, -0.05, hh, topOf(x) - 0.012, 0.012]); }
+  for (; x > L0 + 0.035 * LEN; x -= sp) { const t = (x - L0) / LEN, hh = mix(0.03, 0.09, sstep(0.03, 0.235, t)); PLATES.push([x, 0, hh, topOf(x) - 0.012, 0.014]); }
+})();
+function sdPlates(x, y, z) {
+  let d = 1e9; const zc = zcOf(x);
+  for (let i = 0; i < PLATES.length; i++) {
+    const p = PLATES[i], dx = x - p[0]; if (dx > 0.07 || dx < -0.07) continue;
+    const base = p[3], tri = sdTri(x, y, p[0] - 0.03, base, p[0] + 0.028, base, p[0] - 0.004, base + p[2]);
+    const dz = Math.abs(z - zc - p[1]) - p[4];
+    const dd = Math.min(Math.max(tri, dz), 0) + Math.hypot(Math.max(tri, 0), Math.max(dz, 0));
+    if (dd < d) d = dd;
+  }
+  return d;
+}
+// legs: four stocky tapered-capsule legs splayed sideways, flat feet with toes
+const LEGS = [];
+(() => {
+  for (const side of [-1, 1]) {
+    const zf = zcOf(0.44), zh = zcOf(-0.36);
+    LEGS.push({ cx: 0.5, a: [0.44, 0.135, zf + side * 0.21], b: [0.40, 0.125, zf + side * 0.42], c: [0.52, 0.045, zf + side * 0.52], ra: 0.08, rb: 0.06, rc: 0.045,
+      f: [0.58, 0.0, zf + side * 0.54], fr: [0.085, 0.028, 0.075], toes: 5, base: side * 0.35, spread: 0.32, tl: 0.085 });
+    LEGS.push({ cx: -0.3, a: [-0.36, 0.14, zh + side * 0.23], b: [-0.44, 0.13, zh + side * 0.46], c: [-0.30, 0.045, zh + side * 0.56], ra: 0.09, rb: 0.065, rc: 0.05,
+      f: [-0.22, 0.0, zh + side * 0.58], fr: [0.095, 0.03, 0.08], toes: 4, base: side * 0.40, spread: 0.36, tl: 0.095 });
+  }
+  for (const L of LEGS) { L.tips = []; for (let i = 0; i < L.toes; i++) { const a = L.base + (i - (L.toes - 1) / 2) * L.spread; L.tips.push([L.f[0] + Math.cos(a) * L.tl * (i === (L.toes - 1) / 2 ? 1.1 : 1), 0.012, L.f[2] + Math.sin(a) * L.tl]); } L.fc = [L.f[0], 0.014, L.f[2]]; }
+})();
+function sdLegs(x, y, z) {
+  let d = 1e9;
+  for (let i = 0; i < LEGS.length; i++) {
+    const L = LEGS[i]; if (y > 0.32 || Math.abs(x - L.cx) > 0.55 || Math.abs(z - L.f[2]) > 0.5) continue;
+    let dl = sdRoundCone(x, y, z, L.a, L.b, L.ra, L.rb);
+    dl = smin(dl, sdRoundCone(x, y, z, L.b, L.c, L.rb, L.rc), 0.03);
+    dl = smin(dl, sdEllipsoid(x, y, z, L.f[0], L.f[1], L.f[2], L.fr[0], L.fr[1], L.fr[2]), 0.035);
+    for (let k = 0; k < L.toes; k++) dl = smin(dl, sdRoundCone(x, y, z, L.fc, L.tips[k], 0.021, 0.012), 0.018);
+    if (dl < d) d = dl;
+  }
+  return d;
+}
+const wRot = x => sstep(XH - 0.16, XH, x);
+function sdHeadShape(x, y, z) { let d = swept(x, y, z); return smin(d, sdSphere(x, y, z, L1 - 0.06, 0.055, zcOf(L1 - 0.06), 0.07), 0.05); }
+function bodyCoords(x, y, z, out) { // t, s, un, vn for a point in the unrotated frame
+  const w = wOf(x), top = topOf(x), zc = zcOf(x), h = (top - BOTTOM) * 0.5, cy = (top + BOTTOM) * 0.5;
+  out[0] = (x - L0) / LEN; out[1] = sOf(x); out[2] = (z - zc) / w; out[3] = (y - cy) / h; return out;
+}
+const BC = [0, 0, 0, 0];
+function sdJelly(x, y, z) {
+  let d;
+  if (x < XH - 0.2) {
+    d = swept(x, y, z);
+    bodyCoords(x, y, z, BC); d -= scuteBump(BC[0], BC[1], BC[2], BC[3]);
+    if (x < L0 + 0.47 * LEN) d = Math.min(d, sdPlates(x, y, z));
+  } else {
+    const zc = zcOf(x);
+    // lower jaw: lies flat and still on the table
+    let dl = sdHeadShape(x, y, z);
+    if (x > XH) {
+      dl = Math.max(dl, y - YM);
+      dl = Math.max(dl, -sdEllipsoid(x, y, z, XH + 0.33, YM + 0.006, zc, 0.27, 0.02, 0.10));            // nearly flat floor of the mouth
+      dl = smin(dl, sdEllipsoid(x, y, z, XH + 0.30, YM - 0.014, zc, 0.25, 0.032, 0.085), 0.02);         // soft tongue pad
+    }
+    // upper head: swung up about the corner of the mouth
+    const a = GAPE0 * wRot(x), c = Math.cos(a), s = Math.sin(a);
+    const xr = XH + (x - XH) * c + (y - YM) * s, yr = YM - (x - XH) * s + (y - YM) * c;
+    let du = sdHeadShape(xr, yr, z);
+    bodyCoords(xr, yr, z, BC); du -= scuteBump(BC[0], BC[1], BC[2], BC[3]);
+    if (xr > XH) {
+      du = Math.max(du, YM - yr);
+      du = Math.max(du, -sdEllipsoid(xr, yr, z, XH + 0.36, YM - 0.004, zc, 0.28, 0.02, 0.10));          // shallow palate
+    }
+    const ey = topOf(XH + 0.1) - 0.012, ez = zcOf(XH + 0.1);
+    du = smin(du, sdSphere(xr, yr, z, XH + 0.10, ey, ez + 0.085, 0.04), 0.025);
+    du = smin(du, sdSphere(xr, yr, z, XH + 0.10, ey, ez - 0.085, 0.04), 0.025);
+    d = Math.min(dl, du);
+  }
+  d = Math.min(d, sdLegs(x, y, z));
+  return Math.max(d, -y);
+}
+function sdCore(x, y, z) {
+  const dj = sdJelly(x, y, z) + 0.014; if (dj > 0.03) return dj;
+  const scallop = 0.05 + 0.012 * Math.sin(sOf(x) * 34), top = mix(scallop, YM - 0.007, sstep(XH - 0.35, XH - 0.08, x));
+  return Math.max(dj, y - top);
+}
+// eye, tooth and marker positions in the cast (open) pose
+function rotUp(x, y) { const a = GAPE0 * wRot(x), c = Math.cos(a), s = Math.sin(a); return [XH + (x - XH) * c - (y - YM) * s, YM + (x - XH) * s + (y - YM) * c]; }
+const EYES = [1, -1].map(side => { const ex = XH + 0.10, ey = topOf(ex) + 0.012, ez = zcOf(ex) + side * 0.097; const r = rotUp(ex, ey); return { c: [r[0], r[1], ez], r: 0.03, side }; });
+const TEETH = [];
+(() => {
+  const n = 13, x0 = XH + 0.10, x1 = L1 - 0.09, sp = (x1 - x0) / (n - 1);
+  for (let i = 0; i < n; i++) {
+    const big = i % 4 === 1, len = big ? 0.05 : 0.032, rad = big ? 0.013 : 0.0085;
+    for (const side of [-1, 1]) {
+      const xl = x0 + i * sp, zl = zcOf(xl) + side * (wOf(xl) - 0.02);
+      TEETH.push({ root: [xl, YM - 0.006, zl], dir: [0, 1, 0], len, rad });
+      const xu = Math.min(x0 + (i + 0.5) * sp, x1), zu = zcOf(xu) + side * (wOf(xu) - 0.02);
+      const a = GAPE0 * wRot(xu), r = rotUp(xu, YM + 0.006);
+      TEETH.push({ root: [r[0], r[1], zu], dir: [Math.sin(a), -Math.cos(a), 0], len, rad });
+    }
+  }
+})();
+const BUBBLES = [];
+(() => { let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 22; i++) { const x = mix(-1.0, 1.15, rnd()); const w = wOf(x), top = topOf(x); const zc = zcOf(x);
+    BUBBLES.push({ c: [x, mix(0.09, top - 0.045, rnd()), zc + (rnd() * 2 - 1) * (w - 0.06) * 0.7], r: mix(0.011, 0.022, rnd())  }); } })();
+const STOMACH = []; for (let i = 0; i < 6; i++) { const x = -0.32 + i * 0.15; STOMACH.push([x, 0.125, zcOf(x)]); }
+
+/* ======================================================================
+   2. SURFACE NETS
+   ====================================================================== */
+const CORNER = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
+const EDGES = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+function surfaceNets(f, bmin, cell, nx, ny, nz) {
+  const F = new Float32Array(nx * ny * nz);
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) { const row = (k * ny + j) * nx, y = bmin[1] + j * cell, z = bmin[2] + k * cell; for (let i = 0; i < nx; i++) F[row + i] = f(bmin[0] + i * cell, y, z); }
+  const cx = nx - 1, cy = ny - 1, cz = nz - 1, vid = new Int32Array(cx * cy * cz).fill(-1), pos = [];
+  const c = new Float32Array(8);
+  for (let k = 0; k < cz; k++) for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
+    let mask = 0;
+    for (let m = 0; m < 8; m++) { const v = F[((k + CORNER[m][2]) * ny + j + CORNER[m][1]) * nx + i + CORNER[m][0]]; c[m] = v; if (v < 0) mask |= 1 << m; }
+    if (mask === 0 || mask === 255) continue;
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (let e = 0; e < 12; e++) {
+      const a = EDGES[e][0], b = EDGES[e][1]; if ((c[a] < 0) === (c[b] < 0)) continue;
+      const t = c[a] / (c[a] - c[b]);
+      sx += CORNER[a][0] + (CORNER[b][0] - CORNER[a][0]) * t; sy += CORNER[a][1] + (CORNER[b][1] - CORNER[a][1]) * t; sz += CORNER[a][2] + (CORNER[b][2] - CORNER[a][2]) * t; n++;
+    }
+    vid[(k * cy + j) * cx + i] = pos.length / 3;
+    pos.push(bmin[0] + (i + sx / n) * cell, bmin[1] + (j + sy / n) * cell, bmin[2] + (k + sz / n) * cell);
+  }
+  const idx = [];
+  const quad = (a, b, cc, d, flip) => { if (a < 0 || b < 0 || cc < 0 || d < 0) return; if (flip) idx.push(a, cc, b, a, d, cc); else idx.push(a, b, cc, a, cc, d); };
+  for (let k = 0; k < cz; k++) for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
+    const v0 = F[(k * ny + j) * nx + i], in0 = v0 < 0;
+    if (i < cx && (F[(k * ny + j) * nx + i + 1] < 0) !== in0 && j > 0 && k > 0) quad(vid[(k * cy + j) * cx + i], vid[(k * cy + j - 1) * cx + i], vid[((k - 1) * cy + j - 1) * cx + i], vid[((k - 1) * cy + j) * cx + i], !in0);
+    if (j < cy && (F[(k * ny + j + 1) * nx + i] < 0) !== in0 && i > 0 && k > 0) quad(vid[(k * cy + j) * cx + i], vid[((k - 1) * cy + j) * cx + i], vid[((k - 1) * cy + j) * cx + i - 1], vid[(k * cy + j) * cx + i - 1], !in0);
+    if (k < cz && (F[((k + 1) * ny + j) * nx + i] < 0) !== in0 && i > 0 && j > 0) quad(vid[(k * cy + j) * cx + i], vid[(k * cy + j) * cx + i - 1], vid[(k * cy + j - 1) * cx + i - 1], vid[(k * cy + j - 1) * cx + i], !in0);
+  }
+  const P = new Float32Array(pos), N = new Float32Array(pos.length), e = cell * 0.5;
+  for (let v = 0; v < P.length; v += 3) {
+    const x = P[v], y = P[v + 1], z = P[v + 2];
+    let gx = f(x + e, y, z) - f(x - e, y, z), gy = f(x, y + e, z) - f(x, y - e, z), gz = f(x, y, z + e) - f(x, y, z - e);
+    const l = Math.hypot(gx, gy, gz) || 1; N[v] = gx / l; N[v + 1] = gy / l; N[v + 2] = gz / l;
+  }
+  return { pos: P, nrm: N, idx: new Uint32Array(idx) };
+}
+
+/* ======================================================================
+   3. TET LATTICE + XPBD SHAPE MATCHING
+   ====================================================================== */
+const HL = 0.085, ORG = [-1.72, 0, -0.78], NX = 42, NY = 7, NZ = 19;
+const CX = NX - 1, CY = NY - 1, CZ = NZ - 1;
+const TET5 = [ // 5 tets per cube, two mirrored parities so face diagonals match
+  [[0, 1, 2, 4], [1, 2, 3, 7], [1, 4, 5, 7], [2, 4, 6, 7], [1, 2, 4, 7]],
+  [[1, 0, 3, 5], [0, 3, 2, 6], [0, 5, 4, 6], [3, 5, 7, 6], [0, 3, 5, 6]]];
+function gradSDF(x, y, z, out) { const e = 0.006; out[0] = sdJelly(x + e, y, z) - sdJelly(x - e, y, z); out[1] = sdJelly(x, y + e, z) - sdJelly(x, y - e, z); out[2] = sdJelly(x, y, z + e) - sdJelly(x, y, z - e); const l = Math.hypot(out[0], out[1], out[2]) || 1; out[0] /= l; out[1] /= l; out[2] /= l; return out; }
+
+class SoftBody {
+  constructor(pointSets) {
+    // --- which cells exist: any corner inside, centre near, or holding a render vertex
+    const cellOn = new Uint8Array(CX * CY * CZ);
+    const ci = (i, j, k) => (k * CY + j) * CX + i;
+    const nodeD = new Float32Array(NX * NY * NZ);
+    for (let k = 0; k < NZ; k++) for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) nodeD[(k * NY + j) * NX + i] = sdJelly(ORG[0] + i * HL, ORG[1] + j * HL, ORG[2] + k * HL);
+    for (let k = 0; k < CZ; k++) for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++) {
+      let on = sdJelly(ORG[0] + (i + 0.5) * HL, ORG[1] + (j + 0.5) * HL, ORG[2] + (k + 0.5) * HL) < 0.35 * HL;
+      for (let m = 0; m < 8 && !on; m++) if (nodeD[((k + CORNER[m][2]) * NY + j + CORNER[m][1]) * NX + i + CORNER[m][0]] < 0) on = true;
+      if (on) cellOn[ci(i, j, k)] = 1;
+    }
+    for (const P of pointSets) for (let v = 0; v < P.length; v += 3) {
+      const i = clamp(((P[v] - ORG[0]) / HL) | 0, 0, CX - 1), j = clamp(((P[v + 1] - ORG[1]) / HL) | 0, 0, CY - 1), k = clamp(((P[v + 2] - ORG[2]) / HL) | 0, 0, CZ - 1);
+      cellOn[ci(i, j, k)] = 1;
+    }
+    // --- nodes
+    const nid = new Int32Array(NX * NY * NZ).fill(-1); const X0 = [];
+    const gi = (i, j, k) => (k * NY + j) * NX + i;
+    for (let k = 0; k < CZ; k++) for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++) if (cellOn[ci(i, j, k)])
+      for (let m = 0; m < 8; m++) { const g = gi(i + CORNER[m][0], j + CORNER[m][1], k + CORNER[m][2]); if (nid[g] < 0) { nid[g] = X0.length / 3; X0.push(ORG[0] + (i + CORNER[m][0]) * HL, ORG[1] + (j + CORNER[m][1]) * HL, ORG[2] + (k + CORNER[m][2]) * HL); } }
+    this.n = X0.length / 3;
+    // --- snap boundary nodes onto the surface (floor nodes slide only in the table plane)
+    const g = [0, 0, 0];
+    for (let p = 0; p < this.n; p++) {
+      let x = X0[p * 3], y = X0[p * 3 + 1], z = X0[p * 3 + 2]; const onFloor = y < 1e-6;
+      for (let it = 0; it < 3; it++) {
+        const d = sdJelly(x, y, z); if (d <= 0.004) break;
+        gradSDF(x, y, z, g); if (onFloor) { g[1] = 0; const l = Math.hypot(g[0], g[2]) || 1; g[0] /= l; g[2] /= l; }
+        const step = Math.min(d, 0.5 * HL - Math.hypot(x - X0[p * 3], y - X0[p * 3 + 1], z - X0[p * 3 + 2])); if (step <= 0) break;
+        x -= g[0] * step; y -= g[1] * step; z -= g[2] * step; if (y < 0) y = 0;
+      }
+      X0[p * 3] = x; X0[p * 3 + 1] = y; X0[p * 3 + 2] = z;
+    }
+    this.X = new Float32Array(X0); this.R0 = new Float32Array(X0); this.R = new Float32Array(X0); this.Xp = new Float32Array(X0); this.V = new Float32Array(this.n * 3);
+    this.acc = new Float32Array(this.n * 3); this.cnt = new Float32Array(this.n);
+    // --- clusters (one per cell) and tets
+    const CL = [], TET = [], tetCell = [], kc = []; this.cellTet = new Int32Array(CX * CY * CZ).fill(-1); this.cellCluster = new Int32Array(CX * CY * CZ).fill(-1);
+    for (let k = 0; k < CZ; k++) for (let j = 0; j < CY; j++) for (let i = 0; i < CX; i++) if (cellOn[ci(i, j, k)]) {
+      const ids = []; for (let m = 0; m < 8; m++) ids.push(nid[gi(i + CORNER[m][0], j + CORNER[m][1], k + CORNER[m][2])]);
+      this.cellCluster[ci(i, j, k)] = CL.length / 8; CL.push(...ids);
+      // firmness by region: legs, crest and head are set firmer than the body
+      const x = ORG[0] + (i + 0.5) * HL, y = ORG[1] + (j + 0.5) * HL, z = ORG[2] + (k + 0.5) * HL, t = (x - L0) / LEN;
+      let f = 1.0;
+      if (x > XH - 0.2) f = 1.6; else if (Math.abs(z - zcOf(x)) > wOf(x) + 0.03 && y < 0.3) f = 1.7; else if (t < 0.46 && y > topOf(x) - 0.02) f = 1.8;
+      kc.push(f);
+      this.cellTet[ci(i, j, k)] = TET.length / 4;
+      const par = (i + j + k) & 1;
+      for (const tt of TET5[par]) { const a = ids[tt[0]], b = ids[tt[1]], c = ids[tt[2]], d = ids[tt[3]]; TET.push(a, b, c, d); tetCell.push(CL.length / 8 - 1); }
+    }
+    this.CL = new Int32Array(CL); this.nc = CL.length / 8; this.kFac = new Float32Array(kc); this.RQ = new Float32Array(this.nc * 24); this.q = new Float32Array(this.nc * 4); for (let c = 0; c < this.nc; c++) this.q[c * 4 + 3] = 1;
+    this.TET = new Int32Array(TET); this.nt = TET.length / 4; this.tetCell = new Int32Array(tetCell);
+    // rest Dm^-1 per tet (from the snapped rest) and orientation fix
+    this.DmInv = new Float32Array(this.nt * 9); this.tetUsed = new Uint8Array(this.nt); this.FinvT = new Float32Array(this.nt * 9);
+    const R = this.R0;
+    for (let t = 0; t < this.nt; t++) {
+      let a = TET[t * 4], b = TET[t * 4 + 1], c = TET[t * 4 + 2], d = TET[t * 4 + 3];
+      const m = [R[b * 3] - R[a * 3], R[c * 3] - R[a * 3], R[d * 3] - R[a * 3], R[b * 3 + 1] - R[a * 3 + 1], R[c * 3 + 1] - R[a * 3 + 1], R[d * 3 + 1] - R[a * 3 + 1], R[b * 3 + 2] - R[a * 3 + 2], R[c * 3 + 2] - R[a * 3 + 2], R[d * 3 + 2] - R[a * 3 + 2]];
+      let det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) + m[2] * (m[3] * m[7] - m[4] * m[6]);
+      if (det < 0) { this.TET[t * 4 + 2] = d; this.TET[t * 4 + 3] = c; const t1 = m[1]; m[1] = m[2]; m[2] = t1; const t4 = m[4]; m[4] = m[5]; m[5] = t4; const t7 = m[7]; m[7] = m[8]; m[8] = t7; det = -det; }
+      const id = Math.abs(det) < 1e-12 ? 0 : 1 / det, o = t * 9;
+      this.DmInv[o] = (m[4] * m[8] - m[5] * m[7]) * id; this.DmInv[o + 1] = (m[2] * m[7] - m[1] * m[8]) * id; this.DmInv[o + 2] = (m[1] * m[5] - m[2] * m[4]) * id;
+      this.DmInv[o + 3] = (m[5] * m[6] - m[3] * m[8]) * id; this.DmInv[o + 4] = (m[0] * m[8] - m[2] * m[6]) * id; this.DmInv[o + 5] = (m[2] * m[3] - m[0] * m[5]) * id;
+      this.DmInv[o + 6] = (m[3] * m[7] - m[4] * m[6]) * id; this.DmInv[o + 7] = (m[1] * m[6] - m[0] * m[7]) * id; this.DmInv[o + 8] = (m[0] * m[4] - m[1] * m[3]) * id;
+    }
+    // per-node muscle data
+    this.lat = new Float32Array(this.n); this.up = new Float32Array(this.n);
+    for (let p = 0; p < this.n; p++) {
+      const x = R[p * 3], y = R[p * 3 + 1]; this.lat[p] = R[p * 3 + 2] - zcOf(x);
+      const a = GAPE0 * wRot(x), yr = YM - (x - XH) * Math.sin(a) + (y - YM) * Math.cos(a);
+      this.up[p] = (x > XH - 0.17 && yr > YM - 0.004) ? wRot(x) : 0;
+    }
+    // mesh edges for the overlay
+    const es = new Set(); for (let t = 0; t < this.nt; t++) for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) { const u = this.TET[t * 4 + a], v = this.TET[t * 4 + b]; es.add(u < v ? u * 65536 + v : v * 65536 + u); }
+    this.edges = Int32Array.from(es);
+    this.grab = null; this.gape = GAPE0; this.bend = new Float32Array(256); this.bendX0 = L0 - 0.3; this.bendDX = (LEN + 0.6) / 255;
+    this.time = 0; this.params = { firm: 0.55, damp: 0.35 };
+    this.hooks = []; this.cacheRest();
+  }
+  // barycentric embedding of points (extrapolates outside the lattice using the best tet)
+  embed(P) {
+    const n = P.length / 3, tet = new Int32Array(n), w = new Float32Array(n * 4), R = this.R0, D = this.DmInv;
+    const tryTet = (t, x, y, z, best) => {
+      const a = this.TET[t * 4], o = t * 9, dx = x - R[a * 3], dy = y - R[a * 3 + 1], dz = z - R[a * 3 + 2];
+      const b1 = D[o] * dx + D[o + 1] * dy + D[o + 2] * dz, b2 = D[o + 3] * dx + D[o + 4] * dy + D[o + 5] * dz, b3 = D[o + 6] * dx + D[o + 7] * dy + D[o + 8] * dz, b0 = 1 - b1 - b2 - b3;
+      const mn = Math.min(b0, b1, b2, b3); if (mn > best.mn) { best.mn = mn; best.t = t; best.b0 = b0; best.b1 = b1; best.b2 = b2; best.b3 = b3; }
+    };
+    for (let v = 0; v < n; v++) {
+      const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
+      const i0 = clamp(((x - ORG[0]) / HL) | 0, 0, CX - 1), j0 = clamp(((y - ORG[1]) / HL) | 0, 0, CY - 1), k0 = clamp(((z - ORG[2]) / HL) | 0, 0, CZ - 1);
+      const best = { mn: -1e9, t: -1 };
+      const visit = (i, j, k) => { if (i < 0 || j < 0 || k < 0 || i >= CX || j >= CY || k >= CZ) return; const t0 = this.cellTet[(k * CY + j) * CX + i]; if (t0 < 0) return; for (let t = t0; t < t0 + 5; t++) tryTet(t, x, y, z, best); };
+      visit(i0, j0, k0);
+      if (best.mn < -0.02) for (let dk = -1; dk <= 1; dk++) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if (di || dj || dk) visit(i0 + di, j0 + dj, k0 + dk);
+      if (best.t < 0) { best.t = 0; best.b0 = 1; best.b1 = best.b2 = best.b3 = 0; }
+      tet[v] = best.t; w[v * 4] = best.b0; w[v * 4 + 1] = best.b1; w[v * 4 + 2] = best.b2; w[v * 4 + 3] = best.b3; this.tetUsed[best.t] = 1;
+    }
+    return { tet, w, n };
+  }
+  // positions of embedded points in the current configuration
+  skin(E, out) {
+    const X = this.X, T = this.TET;
+    for (let v = 0; v < E.n; v++) {
+      const t = E.tet[v] * 4, a = T[t] * 3, b = T[t + 1] * 3, c = T[t + 2] * 3, d = T[t + 3] * 3, w0 = E.w[v * 4], w1 = E.w[v * 4 + 1], w2 = E.w[v * 4 + 2], w3 = E.w[v * 4 + 3];
+      out[v * 3] = w0 * X[a] + w1 * X[b] + w2 * X[c] + w3 * X[d];
+      out[v * 3 + 1] = w0 * X[a + 1] + w1 * X[b + 1] + w2 * X[c + 1] + w3 * X[d + 1];
+      out[v * 3 + 2] = w0 * X[a + 2] + w1 * X[b + 2] + w2 * X[c + 2] + w3 * X[d + 2];
+    }
+  }
+  skinNormals(E, N0, out) {
+    const F = this.FinvT;
+    for (let v = 0; v < E.n; v++) {
+      const o = E.tet[v] * 9, nx = N0[v * 3], ny = N0[v * 3 + 1], nz = N0[v * 3 + 2];
+      let x = F[o] * nx + F[o + 1] * ny + F[o + 2] * nz, y = F[o + 3] * nx + F[o + 4] * ny + F[o + 5] * nz, z = F[o + 6] * nx + F[o + 7] * ny + F[o + 8] * nz;
+      const l = Math.sqrt(x * x + y * y + z * z) || 1; out[v * 3] = x / l; out[v * 3 + 1] = y / l; out[v * 3 + 2] = z / l;
+    }
+  }
+  // F^-T per used tet, relative to the cast rest pose (so cast normals can be carried along)
+  updateF() {
+    const X = this.X, T = this.TET, D = this.DmInv, F = this.FinvT;
+    for (let t = 0; t < this.nt; t++) {
+      if (!this.tetUsed[t]) continue;
+      const a = T[t * 4] * 3, b = T[t * 4 + 1] * 3, c = T[t * 4 + 2] * 3, d = T[t * 4 + 3] * 3, o = t * 9;
+      const s0 = X[b] - X[a], s1 = X[c] - X[a], s2 = X[d] - X[a], s3 = X[b + 1] - X[a + 1], s4 = X[c + 1] - X[a + 1], s5 = X[d + 1] - X[a + 1], s6 = X[b + 2] - X[a + 2], s7 = X[c + 2] - X[a + 2], s8 = X[d + 2] - X[a + 2];
+      const d0 = D[o], d1 = D[o + 1], d2 = D[o + 2], d3 = D[o + 3], d4 = D[o + 4], d5 = D[o + 5], d6 = D[o + 6], d7 = D[o + 7], d8 = D[o + 8];
+      // F = Ds * DmInv
+      const f0 = s0 * d0 + s1 * d3 + s2 * d6, f1 = s0 * d1 + s1 * d4 + s2 * d7, f2 = s0 * d2 + s1 * d5 + s2 * d8;
+      const f3 = s3 * d0 + s4 * d3 + s5 * d6, f4 = s3 * d1 + s4 * d4 + s5 * d7, f5 = s3 * d2 + s4 * d5 + s5 * d8;
+      const f6 = s6 * d0 + s7 * d3 + s8 * d6, f7 = s6 * d1 + s7 * d4 + s8 * d7, f8 = s6 * d2 + s7 * d5 + s8 * d8;
+      let det = f0 * (f4 * f8 - f5 * f7) - f1 * (f3 * f8 - f5 * f6) + f2 * (f3 * f7 - f4 * f6);
+      if (Math.abs(det) < 1e-9) { F[o] = F[o + 4] = F[o + 8] = 1; F[o + 1] = F[o + 2] = F[o + 3] = F[o + 5] = F[o + 6] = F[o + 7] = 0; continue; }
+      const id = 1 / det; // inverse transpose = adjugate^T / det  → cofactor matrix / det
+      F[o] = (f4 * f8 - f5 * f7) * id; F[o + 1] = (f5 * f6 - f3 * f8) * id; F[o + 2] = (f3 * f7 - f4 * f6) * id;
+      F[o + 3] = (f2 * f7 - f1 * f8) * id; F[o + 4] = (f0 * f8 - f2 * f6) * id; F[o + 5] = (f1 * f6 - f0 * f7) * id;
+      F[o + 6] = (f1 * f5 - f2 * f4) * id; F[o + 7] = (f2 * f3 - f0 * f5) * id; F[o + 8] = (f0 * f4 - f1 * f3) * id;
+    }
+  }
+  // --- muscles: rewrite the rest shape from the cast pose
+  setBend(fn) { for (let i = 0; i < 256; i++) this.bend[i] = fn(this.bendX0 + i * this.bendDX); }
+  bendAt(x) { const f = clamp((x - this.bendX0) / this.bendDX, 0, 254.999), i = f | 0, u = f - i; return this.bend[i] + (this.bend[i + 1] - this.bend[i]) * u; }
+  rewriteRest() {
+    const R0 = this.R0, R = this.R, da = this.gape - GAPE0;
+    for (let p = 0; p < this.n; p++) {
+      let x = R0[p * 3], y = R0[p * 3 + 1]; const up = this.up[p];
+      if (up > 0) { const a = da * up, c = Math.cos(a), s = Math.sin(a), dx = x - XH, dy = y - YM; x = XH + dx * c - dy * s; y = YM + dx * s + dy * c; }
+      const dz = this.bendAt(x), dz2 = this.bendAt(x + 0.02), phi = Math.atan2(dz2 - dz, 0.02), l = this.lat[p];
+      R[p * 3] = x - l * Math.sin(phi); R[p * 3 + 1] = y; R[p * 3 + 2] = zcOf(x) + dz + l * Math.cos(phi);
+    }
+    this.cacheRest();
+  }
+  cacheRest() {
+    const R = this.R, CL = this.CL, RQ = this.RQ;
+    for (let c = 0; c < this.nc; c++) {
+      const o = c * 8, q = c * 24; let rx = 0, ry = 0, rz = 0;
+      for (let m = 0; m < 8; m++) { const i = CL[o + m] * 3; rx += R[i]; ry += R[i + 1]; rz += R[i + 2]; }
+      rx *= 0.125; ry *= 0.125; rz *= 0.125;
+      for (let m = 0; m < 8; m++) { const i = CL[o + m] * 3; RQ[q + m * 3] = R[i] - rx; RQ[q + m * 3 + 1] = R[i + 1] - ry; RQ[q + m * 3 + 2] = R[i + 2] - rz; }
+    }
+  }
+  reset() { this.X.set(this.R0); this.Xp.set(this.R0); this.V.fill(0); this.grab = null; this.R.set(this.R0); this.cacheRest(); for (let c = 0; c < this.nc; c++) { this.q[c * 4] = this.q[c * 4 + 1] = this.q[c * 4 + 2] = 0; this.q[c * 4 + 3] = 1; } }
+  // --- the step: 60 Hz, 10 substeps
+  step(dt, sub, g) {
+    const n = this.n, X = this.X, Xp = this.Xp, V = this.V, h = dt / sub;
+    const kBase = mix(0.12, 0.55, this.params.firm);
+    for (let s = 0; s < sub; s++) {
+      for (let p = 0; p < n; p++) { const o = p * 3; Xp[o] = X[o]; Xp[o + 1] = X[o + 1]; Xp[o + 2] = X[o + 2]; V[o + 1] -= g * h; X[o] += V[o] * h; X[o + 1] += V[o + 1] * h; X[o + 2] += V[o + 2] * h; }
+      this.shapeMatch(kBase);
+      if (this.grab) this.applyGrab();
+      for (const f of this.hooks) f(h);
+      // the table: y ≥ 0 with friction
+      for (let p = 0; p < n; p++) { const o = p * 3; if (X[o + 1] < 0) { X[o + 1] = 0; X[o] += (Xp[o] - X[o]) * 0.7; X[o + 2] += (Xp[o + 2] - X[o + 2]) * 0.7; } }
+      const ih = 1 / h; for (let p = 0; p < n * 3; p++) V[p] = (X[p] - Xp[p]) * ih;
+    }
+    this.internalDamping(this.params.damp * 0.35);
+    this.time += dt;
+  }
+  shapeMatch(kBase) {
+    const X = this.X, CL = this.CL, RQ = this.RQ, acc = this.acc, cnt = this.cnt, q = this.q, kFac = this.kFac; acc.fill(0); cnt.fill(0);
+    for (let c = 0; c < this.nc; c++) {
+      const o = c * 8, qo = c * 24; let cx = 0, cy = 0, cz = 0;
+      for (let m = 0; m < 8; m++) { const i = CL[o + m] * 3; cx += X[i]; cy += X[i + 1]; cz += X[i + 2]; }
+      cx *= 0.125; cy *= 0.125; cz *= 0.125;
+      let a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0, a6 = 0, a7 = 0, a8 = 0;
+      for (let m = 0; m < 8; m++) { const i = CL[o + m] * 3, r = qo + m * 3, px = X[i] - cx, py = X[i + 1] - cy, pz = X[i + 2] - cz, qx = RQ[r], qy = RQ[r + 1], qz = RQ[r + 2];
+        a0 += px * qx; a1 += px * qy; a2 += px * qz; a3 += py * qx; a4 += py * qy; a5 += py * qz; a6 += pz * qx; a7 += pz * qy; a8 += pz * qz; }
+      // polar decomposition: one warm-started small-angle quaternion update per substep (Müller et al. 2016)
+      let qx = q[c * 4], qy = q[c * 4 + 1], qz = q[c * 4 + 2], qw = q[c * 4 + 3];
+      let xx = qx * qx, yy = qy * qy, zz = qz * qz, xy = qx * qy, xz = qx * qz, yz = qy * qz, wx = qw * qx, wy = qw * qy, wz = qw * qz;
+      let r0 = 1 - 2 * (yy + zz), r1 = 2 * (xy - wz), r2 = 2 * (xz + wy), r3 = 2 * (xy + wz), r4 = 1 - 2 * (xx + zz), r5 = 2 * (yz - wx), r6 = 2 * (xz - wy), r7 = 2 * (yz + wx), r8 = 1 - 2 * (xx + yy);
+      const ox = (r3 * a6 - r6 * a3) + (r4 * a7 - r7 * a4) + (r5 * a8 - r8 * a5);
+      const oy = (r6 * a0 - r0 * a6) + (r7 * a1 - r1 * a7) + (r8 * a2 - r2 * a8);
+      const oz = (r0 * a3 - r3 * a0) + (r1 * a4 - r4 * a1) + (r2 * a5 - r5 * a2);
+      const den = Math.abs(r0 * a0 + r3 * a3 + r6 * a6 + r1 * a1 + r4 * a4 + r7 * a7 + r2 * a2 + r5 * a5 + r8 * a8) + 1e-9;
+      let wx2 = ox / den, wy2 = oy / den, wz2 = oz / den; const w2 = wx2 * wx2 + wy2 * wy2 + wz2 * wz2;
+      if (w2 > 1e-14) {
+        if (w2 > 0.25) { const s = 0.5 / Math.sqrt(w2); wx2 *= s; wy2 *= s; wz2 *= s; } // cap the rotation step
+        const dx = wx2 * 0.5, dy = wy2 * 0.5, dz = wz2 * 0.5;
+        const nx = qx + dx * qw + dy * qz - dz * qy, ny = qy - dx * qz + dy * qw + dz * qx, nz = qz + dx * qy - dy * qx + dz * qw, nw = qw - dx * qx - dy * qy - dz * qz;
+        const il = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz + nw * nw); qx = nx * il; qy = ny * il; qz = nz * il; qw = nw * il;
+        q[c * 4] = qx; q[c * 4 + 1] = qy; q[c * 4 + 2] = qz; q[c * 4 + 3] = qw;
+        xx = qx * qx; yy = qy * qy; zz = qz * qz; xy = qx * qy; xz = qx * qz; yz = qy * qz; wx = qw * qx; wy = qw * qy; wz = qw * qz;
+        r0 = 1 - 2 * (yy + zz); r1 = 2 * (xy - wz); r2 = 2 * (xz + wy); r3 = 2 * (xy + wz); r4 = 1 - 2 * (xx + zz); r5 = 2 * (yz - wx); r6 = 2 * (xz - wy); r7 = 2 * (yz + wx); r8 = 1 - 2 * (xx + yy);
+      }
+      const k = Math.min(0.85, kBase * kFac[c]);
+      for (let m = 0; m < 8; m++) { const id = CL[o + m], i = id * 3, r = qo + m * 3, qx2 = RQ[r], qy2 = RQ[r + 1], qz2 = RQ[r + 2];
+        acc[i] += k * (r0 * qx2 + r1 * qy2 + r2 * qz2 + cx - X[i]); acc[i + 1] += k * (r3 * qx2 + r4 * qy2 + r5 * qz2 + cy - X[i + 1]); acc[i + 2] += k * (r6 * qx2 + r7 * qy2 + r8 * qz2 + cz - X[i + 2]); cnt[id] += 1; }
+    }
+    for (let p = 0; p < this.n; p++) { const c = cnt[p]; if (!c) continue; const i = p * 3, ic = 1 / c; X[i] += acc[i] * ic; X[i + 1] += acc[i + 1] * ic; X[i + 2] += acc[i + 2] * ic; }
+  }
+  internalDamping(kd) {
+    if (kd <= 0) return; const V = this.V, CL = this.CL, acc = this.acc, cnt = this.cnt; acc.fill(0); cnt.fill(0);
+    for (let c = 0; c < this.nc; c++) { const o = c * 8; let vx = 0, vy = 0, vz = 0; for (let m = 0; m < 8; m++) { const i = CL[o + m] * 3; vx += V[i]; vy += V[i + 1]; vz += V[i + 2]; } vx *= 0.125; vy *= 0.125; vz *= 0.125;
+      for (let m = 0; m < 8; m++) { const id = CL[o + m], i = id * 3; acc[i] += vx - V[i]; acc[i + 1] += vy - V[i + 1]; acc[i + 2] += vz - V[i + 2]; cnt[id] += 1; } }
+    for (let p = 0; p < this.n; p++) { const c = cnt[p]; if (!c) continue; const i = p * 3, f = kd / c; V[i] += acc[i] * f; V[i + 1] += acc[i + 1] * f; V[i + 2] += acc[i + 2] * f; }
+  }
+  // --- grabbing
+  startGrab(px, py, pz, radius) {
+    const X = this.X, ids = [], off = []; for (let p = 0; p < this.n; p++) { const i = p * 3, d = Math.hypot(X[i] - px, X[i + 1] - py, X[i + 2] - pz); if (d < radius) { ids.push(p); off.push(X[i] - px, X[i + 1] - py, X[i + 2] - pz); } }
+    if (!ids.length) return false;
+    this.grab = { ids, off: new Float32Array(off), t: [px, py, pz], twist: 0, axis: [0, 1, 0], k: 0.3 }; return true;
+  }
+  applyGrab() {
+    const G = this.grab, X = this.X, ca = Math.cos(G.twist), sa = Math.sin(G.twist), ax = G.axis[0], ay = G.axis[1], az = G.axis[2];
+    for (let j = 0; j < G.ids.length; j++) {
+      const i = G.ids[j] * 3; let ox = G.off[j * 3], oy = G.off[j * 3 + 1], oz = G.off[j * 3 + 2];
+      // Rodrigues rotation of the offset about the twist axis
+      const dot = ax * ox + ay * oy + az * oz, cx = ay * oz - az * oy, cy = az * ox - ax * oz, cz = ax * oy - ay * ox;
+      ox = ox * ca + cx * sa + ax * dot * (1 - ca); oy = oy * ca + cy * sa + ay * dot * (1 - ca); oz = oz * ca + cz * sa + az * dot * (1 - ca);
+      X[i] += (G.t[0] + ox - X[i]) * G.k; X[i + 1] += (G.t[1] + oy - X[i + 1]) * G.k; X[i + 2] += (G.t[2] + oz - X[i + 2]) * G.k;
+    }
+  }
+  impulse(fn) { const V = this.V, R0 = this.R0; for (let p = 0; p < this.n; p++) fn(p, R0[p * 3], R0[p * 3 + 1], R0[p * 3 + 2], V); }
+}
+
+/* ======================================================================
+   4. SHADERS (all hand-written ShaderMaterials)
+   ====================================================================== */
+const GLSL_COMMON = /* glsl */`
+  uniform vec3 uLightDir; uniform mat4 uLightVP; uniform sampler2D uShadow; uniform float uShadowSize;
+  float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+  vec2 hash22(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
+  float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash12(i), hash12(i + vec2(1, 0)), f.x), mix(hash12(i + vec2(0, 1)), hash12(i + vec2(1, 1)), f.x), f.y); }
+  float shadowAt(vec3 wp, vec3 n) {
+    vec4 lp = uLightVP * vec4(wp + n * 0.012, 1.0); vec3 p = lp.xyz / lp.w * 0.5 + 0.5;
+    if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) return 1.0;
+    float s = 0.0; float z = p.z - 0.0012;
+    for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) { float d = textureLod(uShadow, p.xy + vec2(float(i), float(j)) / uShadowSize, 0.0).r; s += z > d ? 0.0 : 1.0; }
+    return s / 9.0;
+  }
+  vec3 bumpNormal(vec3 N, vec3 P, float h, float scale) {
+    vec3 dpdx = dFdx(P), dpdy = dFdy(P); float dhdx = dFdx(h), dhdy = dFdy(h);
+    vec3 r1 = cross(dpdy, N), r2 = cross(N, dpdx); float det = dot(dpdx, r1);
+    vec3 g = (dhdx * r1 + dhdy * r2) / (abs(det) + 1e-14) * sign(det); float gl = length(g); if (gl > 60.0) g *= 60.0 / gl;
+    return normalize(N - scale * g);
+  }
+  vec3 srgb2lin(vec3 c) { return pow(max(c, 0.0), vec3(2.2)); }
+`;
+const SHADOW_UNIFORMS = () => ({ uLightDir: { value: new V3() }, uLightVP: { value: new THREE.Matrix4() }, uShadow: { value: null }, uShadowSize: { value: 2048 } });
+
+// --- depth-only (shadow) and thickness passes
+const depthMat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, vertexShader: `void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`, fragmentShader: `void main(){ gl_FragColor = vec4(1.0); }` });
+const thickVert = `varying float vZ; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vZ = -mv.z; gl_Position = projectionMatrix * mv; }`;
+const thickFrag = `varying float vZ; void main(){ gl_FragColor = vec4(vZ, 0.0, 0.0, 1.0); }`;
+const thickBackMat = new THREE.ShaderMaterial({ side: THREE.BackSide, vertexShader: thickVert, fragmentShader: thickFrag });
+const thickFrontMat = new THREE.ShaderMaterial({ side: THREE.FrontSide, vertexShader: thickVert, fragmentShader: thickFrag });
+
+// --- the clear jelly: refraction through the front faces
+const jellyVert = /* glsl */`
+  attribute vec2 aBody; attribute vec2 aUp; attribute float aHead; attribute float aMouth;
+  varying vec3 vWP; varying vec3 vN; varying vec2 vBody; varying vec2 vUp; varying float vHead; varying float vMouth; varying float vZ;
+  void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vN = normalize(mat3(modelMatrix) * normal);
+    vBody = aBody; vUp = aUp; vHead = aHead; vMouth = aMouth; vec4 mv = viewMatrix * wp; vZ = -mv.z; gl_Position = projectionMatrix * mv; }`;
+const jellyFrag = /* glsl */`
+  precision highp float;
+  ${GLSL_COMMON}
+  uniform sampler2D uBg; uniform sampler2D uThick; uniform vec2 uRes; uniform vec3 uCol; uniform vec3 uScatter; uniform vec3 uPink; uniform vec3 uBand; uniform float uTime; uniform float uDebug;
+  varying vec3 vWP; varying vec3 vN; varying vec2 vBody; varying vec2 vUp; varying float vHead; varying float vMouth; varying float vZ;
+  float plateH(vec2 f, vec2 half_) { vec2 d = abs(f - 0.5) - half_; float r = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); return 1.0 - smoothstep(-0.04, 0.12, r); }
+  void main(){
+    vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vWP); vec2 suv = gl_FragCoord.xy / uRes;
+    float s = vBody.x, th = vBody.y;
+    // --- scales: oblong plates in staggered rows on the body and tail
+    vec2 pc = vec2(s / 0.062, th / 0.26); float rowOff = mod(floor(pc.y), 2.0) * 0.5; pc.x += rowOff;
+    float plates = plateH(fract(pc), vec2(0.36, 0.30));
+    // --- head: an irregular cell crackle
+    vec2 hc = vec2(s / 0.055, th / 0.22); vec2 hi = floor(hc), hf = fract(hc); float f1 = 9.0, f2 = 9.0;
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { vec2 g = vec2(float(i), float(j)); vec2 o = hash22(hi + g); float d = length(g + o - hf); if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
+    float crackle = smoothstep(0.0, 0.16, f2 - f1);
+    float h = mix(plates, crackle, vHead);
+    float groove = (1.0 - h) * (1.0 - vMouth);
+    vec3 Nb = bumpNormal(N, vWP, h * (1.0 - vMouth), 0.011);
+    // --- ragged crossbands on the back and tail, fading down the flank
+    float rag = (vnoise(vec2(s * 9.0, th * 2.2)) - 0.5) * 0.9 + (vnoise(vec2(s * 30.0, th * 6.0)) - 0.5) * 0.5;
+    float band = smoothstep(0.42, 0.62, 0.5 + 0.5 * sin(s * 11.5 + rag)) * smoothstep(-0.15, 0.6, vUp.x) * (1.0 - smoothstep(1.0, 1.25, vUp.y)) * (1.0 - vHead) * (1.0 - vMouth);
+    // --- sense pits along the jaws
+    vec2 pp = vec2(s * 26.0, th * 5.0); float pit = (1.0 - smoothstep(0.16, 0.30, length(fract(pp) - 0.5))) * step(0.45, hash12(floor(pp))) * vHead * (1.0 - vMouth) * smoothstep(0.9, 0.3, abs(vUp.x));
+    // --- lighting
+    vec3 L = normalize(uLightDir); float sh = shadowAt(vWP, N);
+    float ndl = dot(Nb, L); float wrap = clamp((ndl + 0.55) / 1.55, 0.0, 1.0);
+    vec3 H = normalize(L + V); float nh = max(dot(Nb, H), 0.0); float spec = pow(nh, 140.0) * 1.4 + pow(nh, 14.0) * 0.07;
+    float fres = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+    // --- thickness and refraction
+    float backD = texture2D(uThick, suv).r; float thick = backD > 50.0 ? 0.05 : max(backD - vZ, 0.035);
+    vec3 nv = normalize((viewMatrix * vec4(Nb, 0.0)).xyz);
+    vec2 off = -nv.xy * 0.075 * clamp(thick / 0.2, 0.15, 1.0);
+    vec3 bg = srgb2lin(texture2D(uBg, clamp(suv + off, vec2(0.002), vec2(0.998))).rgb);
+    vec3 sigma = -log(max(uCol, vec3(0.02))) / 0.12;
+    vec3 T = exp(-sigma * thick);
+    T *= 1.0 - 0.26 * groove - 0.45 * pit;
+    T = mix(T, T * uBand, band);
+    vec3 scat = uScatter * (1.0 - exp(-thick * 7.0)) * (0.35 + 0.65 * wrap * mix(0.45, 1.0, sh)) * mix(1.0, 0.55, band);
+    vec3 sky = vec3(0.92, 0.91, 0.89);
+    vec3 col = bg * T * (1.0 - fres) + scat * (1.0 - 0.3 * groove) + sky * fres * 0.55 + spec * mix(0.45, 1.0, sh) * mix(0.6, 1.0, fres);
+    // --- the mouth: soft pink, lit like a solid
+    vec3 mcol = uPink * (0.32 + 0.68 * wrap * mix(0.4, 1.0, sh)) + spec * 0.5 + sky * fres * 0.2;
+    col = mix(col, mcol, vMouth);
+    if (uDebug > 0.5) col = vec3(band);
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
+// --- the cream core with square belly plates
+const coreVert = /* glsl */`
+  attribute vec2 aBody; varying vec3 vWP; varying vec3 vN; varying vec2 vBody;
+  void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vN = normalize(mat3(modelMatrix) * normal); vBody = aBody; gl_Position = projectionMatrix * viewMatrix * wp; }`;
+const coreFrag = /* glsl */`
+  precision highp float;
+  ${GLSL_COMMON}
+  uniform vec3 uCream; varying vec3 vWP; varying vec3 vN; varying vec2 vBody;
+  void main(){
+    vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vWP);
+    vec2 pc = vec2(vBody.x / 0.085, vBody.y / 0.26); vec2 f = fract(pc);
+    vec2 d = abs(f - 0.5) - vec2(0.40, 0.38); float r = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); float h = 1.0 - smoothstep(-0.05, 0.1, r);
+    vec3 Nb = bumpNormal(N, vWP, h, 0.008);
+    vec3 L = normalize(uLightDir); float sh = shadowAt(vWP, N);
+    float wrap = clamp((dot(Nb, L) + 0.6) / 1.6, 0.0, 1.0); vec3 H = normalize(L + V); float spec = pow(max(dot(Nb, H), 0.0), 40.0) * 0.25;
+    float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
+    vec3 col = uCream * (0.42 + 0.58 * wrap) * mix(0.6, 1.0, sh) * (1.0 - 0.22 * (1.0 - h)) + spec * mix(0.5, 1.0, sh) + fres * 0.08;
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
+// --- the table
+const tableVert = `varying vec3 vWP; void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`;
+const tableFrag = /* glsl */`
+  precision highp float;
+  ${GLSL_COMMON}
+  uniform vec3 uTable; uniform vec3 uBackdrop; varying vec3 vWP;
+  void main(){
+    float sh = shadowAt(vWP, vec3(0.0, 1.0, 0.0));
+    // soften the shadow by a second, wider tap set
+    float sh2 = 0.0; for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) sh2 += shadowAt(vWP + vec3(float(i), 0.0, float(j)) * 0.012, vec3(0.0, 1.0, 0.0)); sh = mix(sh, sh2 / 9.0, 0.6);
+    vec3 lit = uTable * mix(0.70, 1.0, sh) * (1.0 - 0.04 * smoothstep(0.5, 3.0, length(vWP.xz)));
+    float fade = smoothstep(2.2, 5.5, length(vWP.xz));
+    vec3 col = mix(toneMapping(lit), uBackdrop, fade);
+    gl_FragColor = vec4(col, 1.0);
+    #include <colorspace_fragment>
+  }`;
+
+// --- teeth: ivory sugar, clearer toward the tip
+const teethVert = `attribute float aTip; varying vec3 vWP; varying vec3 vN; varying float vTip; void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vN = normalize(mat3(modelMatrix) * normal); vTip = aTip; gl_Position = projectionMatrix * viewMatrix * wp; }`;
+const teethFrag = /* glsl */`
+  precision highp float;
+  ${GLSL_COMMON}
+  varying vec3 vWP; varying vec3 vN; varying float vTip;
+  void main(){
+    vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vWP); vec3 L = normalize(uLightDir); float sh = shadowAt(vWP, N);
+    float wrap = clamp((dot(N, L) + 0.5) / 1.5, 0.0, 1.0); vec3 H = normalize(L + V); float spec = pow(max(dot(N, H), 0.0), 60.0) * 0.6;
+    float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+    vec3 ivory = vec3(0.93, 0.88, 0.74);
+    vec3 col = ivory * (0.45 + 0.55 * wrap) * mix(0.65, 1.0, sh) + spec * mix(0.5, 1.0, sh);
+    vec3 clear = vec3(0.97, 0.96, 0.92) * (0.75 + 0.25 * wrap) + spec + fres * 0.15;
+    col = mix(col, clear, smoothstep(0.25, 1.0, vTip) * 0.75);
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
+// --- eyes: glossy beads that are all iris, with a vertical slit pupil
+const eyeVert = `attribute vec3 aLocal; varying vec3 vWP; varying vec3 vN; varying vec3 vLocal; void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vN = normalize(mat3(modelMatrix) * normal); vLocal = aLocal; gl_Position = projectionMatrix * viewMatrix * wp; }`;
+const eyeFrag = /* glsl */`
+  precision highp float;
+  ${GLSL_COMMON}
+  uniform vec3 uIris; uniform vec3 uFwd; varying vec3 vWP; varying vec3 vN; varying vec3 vLocal;
+  void main(){
+    vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vWP); vec3 L = normalize(uLightDir);
+    vec3 d = normalize(vLocal); vec3 fw = normalize(uFwd); float ca = dot(d, fw);
+    vec3 up = normalize(vec3(0.0, 1.0, 0.0) - fw * fw.y); vec3 right = cross(fw, up);
+    float px = dot(d, right), py = dot(d, up);
+    float fleck = vnoise(d.xy * 26.0 + d.z * 13.0) * 0.6 + vnoise(d.yz * 61.0) * 0.4;
+    vec3 iris = uIris * mix(0.55, 1.35, fleck) * mix(0.28, 1.0, smoothstep(-0.1, 0.75, ca));
+    float w = 0.11 * sqrt(max(0.0, 1.0 - pow(py / 0.62, 2.0))) * smoothstep(0.0, 0.3, ca);
+    float pupil = 1.0 - smoothstep(w, w + 0.02, abs(px)); pupil *= step(0.0, ca);
+    vec3 col = mix(iris, vec3(0.02, 0.015, 0.01), pupil);
+    float wrap = clamp((dot(N, L) + 0.4) / 1.4, 0.0, 1.0); col *= 0.35 + 0.65 * wrap;
+    vec3 H = normalize(L + V); float spec = pow(max(dot(N, H), 0.0), 220.0) * 2.2 + pow(max(dot(N, H), 0.0), 20.0) * 0.12;
+    float fres = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+    vec3 env = mix(vec3(0.55, 0.53, 0.5), vec3(0.95, 0.94, 0.92), smoothstep(-0.3, 0.8, reflect(-V, N).y));
+    col = col * (1.0 - fres) + env * fres + spec;
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
+// --- trapped air bubbles
+const plainVert = `varying vec3 vWP; varying vec3 vN; void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * wp; }`;
+const bubbleFrag = /* glsl */`
+  precision highp float;
+  ${GLSL_COMMON}
+  uniform vec3 uTint; varying vec3 vWP; varying vec3 vN;
+  void main(){
+    vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vWP); vec3 L = normalize(uLightDir);
+    float fres = pow(1.0 - max(dot(N, V), 0.0), 2.5); vec3 H = normalize(L + V); float spec = pow(max(dot(N, H), 0.0), 120.0) * 1.5;
+    vec3 col = mix(uTint * 1.15, vec3(1.0), fres * 0.85) + spec;
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
+// --- gummy fish
+const fishFrag = /* glsl */`
+  precision highp float;
+  ${GLSL_COMMON}
+  uniform vec3 uFish; varying vec3 vWP; varying vec3 vN;
+  void main(){
+    vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vWP); vec3 L = normalize(uLightDir); float sh = shadowAt(vWP, N);
+    float ndv = max(dot(N, V), 0.0); float wrap = clamp((dot(N, L) + 0.7) / 1.7, 0.0, 1.0);
+    vec3 H = normalize(L + V); float spec = pow(max(dot(N, H), 0.0), 110.0) * 1.1 + pow(max(dot(N, H), 0.0), 10.0) * 0.06;
+    float fres = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+    vec3 deep = uFish * uFish * 1.2;
+    vec3 col = mix(deep, uFish * 1.25, 0.35 + 0.65 * wrap) * mix(0.5, 1.0, sh) * (0.75 + 0.25 * ndv);
+    col = col * (1.0 - fres) + vec3(0.92) * fres * 0.6 + spec * mix(0.5, 1.0, sh);
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
+/* ======================================================================
+   5. RENDERER, PASSES, SCENE
+   ====================================================================== */
+const renderer = new THREE.WebGLRenderer({ canvas, context: gl2, antialias: true });
+renderer.toneMapping = THREE.NeutralToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.autoClear = false;
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60); camera.position.set(1.95, 1.55, 3.55);
+const controls = new OrbitControls(camera, canvas); controls.target.set(-0.15, 0.08, 0.05); controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 1.3; controls.maxDistance = 11; controls.maxPolarAngle = 1.5; controls.enablePan = false; controls.update();
+const LAYER = { BG: 1, THICK: 2, JELLY: 3, SHADOW: 4, MESH: 5 };
+const BACKDROP = new THREE.Color('#e2dfda');
+const lightDir = new V3(0.45, 1.0, 0.55).normalize();
+const lightCam = new THREE.OrthographicCamera(-2.3, 2.3, 1.7, -1.7, 0.5, 12); lightCam.position.copy(lightDir).multiplyScalar(6); lightCam.lookAt(0, 0, 0); lightCam.updateMatrixWorld(); lightCam.layers.set(LAYER.SHADOW);
+const SHADOW_SIZE = 2048;
+const shadowRT = new THREE.WebGLRenderTarget(SHADOW_SIZE, SHADOW_SIZE, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false });
+shadowRT.depthTexture = new THREE.DepthTexture(SHADOW_SIZE, SHADOW_SIZE); shadowRT.depthTexture.minFilter = shadowRT.depthTexture.magFilter = THREE.NearestFilter;
+const SH = SHADOW_UNIFORMS(); SH.uLightDir.value.copy(lightDir); SH.uLightVP.value.multiplyMatrices(lightCam.projectionMatrix, lightCam.matrixWorldInverse); SH.uShadow.value = shadowRT.depthTexture; SH.uShadowSize.value = SHADOW_SIZE;
+let thickRT = null, bgTex = null;
+const THICK_CLEAR = new THREE.Color(100, 0, 0);
+
+const WAYS = {
+  moss: { name: 'Moss', hex: '#5f9e30', iris: '#d9a63a', fish: '#f08a3c' },
+  jade: { name: 'Jade', hex: '#2aae88', iris: '#e8b94a', fish: '#f5c842' },
+  amber: { name: 'Amber', hex: '#e89a30', iris: '#62b24e', fish: '#4d8fe0' },
+  lilac: { name: 'Lilac', hex: '#9a74e2', iris: '#e4b65a', fish: '#ff8fb3' },
+  coral: { name: 'Coral', hex: '#ef6458', iris: '#f0d26b', fish: '#6fd39a' },
+};
+const jellyMat = new THREE.ShaderMaterial({ uniforms: { ...SH, uBg: { value: null }, uThick: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uCol: { value: new THREE.Color() }, uScatter: { value: new THREE.Color() }, uPink: { value: new THREE.Color('#f0a2aa') }, uBand: { value: new THREE.Color(0.42, 0.47, 0.36) }, uTime: { value: 0 }, uDebug: { value: 0 } }, vertexShader: jellyVert, fragmentShader: jellyFrag, side: THREE.FrontSide });
+const coreMat = new THREE.ShaderMaterial({ uniforms: { ...SH, uCream: { value: new THREE.Color('#f6ecd2') } }, vertexShader: coreVert, fragmentShader: coreFrag });
+const tableMat = new THREE.ShaderMaterial({ uniforms: { ...SH, uTable: { value: new THREE.Color('#efece6') }, uBackdrop: { value: BACKDROP.clone() } }, vertexShader: tableVert, fragmentShader: tableFrag });
+const teethMat = new THREE.ShaderMaterial({ uniforms: { ...SH }, vertexShader: teethVert, fragmentShader: teethFrag });
+const eyeMats = [1, -1].map(side => new THREE.ShaderMaterial({ uniforms: { ...SH, uIris: { value: new THREE.Color() }, uFwd: { value: new V3(0.35, 0.3, side).normalize() } }, vertexShader: eyeVert, fragmentShader: eyeFrag }));
+const bubbleMat = new THREE.ShaderMaterial({ uniforms: { ...SH, uTint: { value: new THREE.Color() } }, vertexShader: plainVert, fragmentShader: bubbleFrag });
+const fishMat = new THREE.ShaderMaterial({ uniforms: { ...SH, uFish: { value: new THREE.Color() } }, vertexShader: plainVert, fragmentShader: fishFrag });
+
+const table = new THREE.Mesh(new THREE.PlaneGeometry(16, 16).rotateX(-Math.PI / 2), tableMat); table.layers.set(LAYER.BG); scene.add(table);
+
+/* ======================================================================
+   6. CASTING: meshes, lattice, embedding
+   ====================================================================== */
+function mergeGeos(list, extra) {
+  let nv = 0, ni = 0; for (const g of list) { nv += g.attributes.position.count; ni += g.index.count; }
+  const pos = new Float32Array(nv * 3), nrm = new Float32Array(nv * 3), idx = new Uint32Array(ni), ex = extra ? new Float32Array(nv * extra.size) : null;
+  let vo = 0, io = 0;
+  for (const g of list) { const n = g.attributes.position.count; pos.set(g.attributes.position.array, vo * 3); nrm.set(g.attributes.normal.array, vo * 3); if (ex) ex.set(g.attributes[extra.name].array, vo * extra.size); const I = g.index.array; for (let i = 0; i < I.length; i++) idx[io + i] = I[i] + vo; vo += n; io += I.length; }
+  const out = { pos, nrm, idx, attrs: {} }; if (ex) out.attrs[extra.name] = { array: ex, size: extra.size }; return out;
+}
+class Skinned {
+  constructor(data, body, material, layers) {
+    this.body = body; this.pos0 = data.pos; this.nrm0 = data.nrm; this.pos = new Float32Array(data.pos); this.nrm = new Float32Array(data.nrm);
+    const g = this.geo = new THREE.BufferGeometry();
+    this.pAttr = new THREE.BufferAttribute(this.pos, 3); this.pAttr.setUsage(THREE.DynamicDrawUsage); g.setAttribute('position', this.pAttr);
+    this.nAttr = new THREE.BufferAttribute(this.nrm, 3); this.nAttr.setUsage(THREE.DynamicDrawUsage); g.setAttribute('normal', this.nAttr);
+    for (const k in data.attrs) g.setAttribute(k, new THREE.BufferAttribute(data.attrs[k].array, data.attrs[k].size));
+    g.setIndex(new THREE.BufferAttribute(data.idx, 1));
+    this.E = body.embed(data.pos);
+    this.mesh = new THREE.Mesh(g, material); this.mesh.frustumCulled = false; this.mesh.layers.mask = 0; for (const l of layers) this.mesh.layers.enable(l);
+    scene.add(this.mesh);
+  }
+  update() { this.body.skin(this.E, this.pos); this.body.skinNormals(this.E, this.nrm0, this.nrm); this.pAttr.needsUpdate = true; this.nAttr.needsUpdate = true; }
+}
+// per-vertex body coordinates for the jelly
+function jellyAttrs(P) {
+  const n = P.length / 3, body = new Float32Array(n * 2), up = new Float32Array(n * 2), head = new Float32Array(n), mouth = new Float32Array(n);
+  for (let v = 0; v < n; v++) {
+    const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2]; let xr = x, yr = y, upper = false;
+    if (x > XH - 0.2) { const a = GAPE0 * wRot(x), c = Math.cos(a), s = Math.sin(a), xx = XH + (x - XH) * c + (y - YM) * s, yy = YM - (x - XH) * s + (y - YM) * c; if (yy > YM - 0.002) { xr = xx; yr = yy; upper = true; } }
+    bodyCoords(xr, yr, z, BC);
+    body[v * 2] = BC[1]; body[v * 2 + 1] = Math.atan2(BC[3], BC[2]); up[v * 2] = clamp(BC[3], -1, 1); up[v * 2 + 1] = Math.abs(BC[2]); head[v] = sstep(XH - 0.28, XH - 0.06, xr);
+    let m = 0;
+    if (x > XH + 0.005) {
+      if (!upper) m = sstep(YM - 0.02, YM - 0.007, y); else m = 1 - sstep(YM + 0.006, YM + 0.02, yr);
+      if (xr > L1 - 0.03) m *= 1 - sstep(L1 - 0.03, L1, xr);
+    }
+    mouth[v] = m;
+  }
+  return { aBody: { array: body, size: 2 }, aUp: { array: up, size: 2 }, aHead: { array: head, size: 1 }, aMouth: { array: mouth, size: 1 } };
+}
+function coreAttrs(P) { const n = P.length / 3, body = new Float32Array(n * 2); for (let v = 0; v < n; v++) { bodyCoords(P[v * 3], P[v * 3 + 1], P[v * 3 + 2], BC); body[v * 2] = BC[1]; body[v * 2 + 1] = Math.atan2(BC[3], BC[2]); } return { aBody: { array: body, size: 2 } }; }
+function buildTeeth() {
+  const parts = [];
+  for (const T of TEETH) {
+    const g = new THREE.ConeGeometry(T.rad, T.len, 10, 1, false); g.translate(0, T.len / 2, 0);
+    const tip = new Float32Array(g.attributes.position.count); for (let i = 0; i < tip.length; i++) tip[i] = clamp(g.attributes.position.getY(i) / T.len, 0, 1);
+    g.setAttribute('aTip', new THREE.BufferAttribute(tip, 1));
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), new V3(...T.dir).normalize())); g.translate(...T.root); parts.push(g);
+  }
+  return mergeGeos(parts, { name: 'aTip', size: 1 });
+}
+function buildEye(E) { const g = new THREE.SphereGeometry(E.r, 28, 18); g.setAttribute('aLocal', new THREE.BufferAttribute(g.attributes.position.array.slice(), 3)); g.translate(...E.c); return mergeGeos([g], { name: 'aLocal', size: 3 }); }
+function buildBubbles() { return mergeGeos(BUBBLES.map(B => new THREE.SphereGeometry(B.r, 10, 8).translate(...B.c))); }
+function sdFish(x, y, z) {
+  let d = sdEllipsoid(x, y, z, 0.012, 0, 0, 0.078, 0.034, 0.02);
+  const tri = sdTri(x, y, -0.055, 0, -0.125, 0.042, -0.125, -0.042), dz = Math.abs(z) - 0.006;
+  d = smin(d, Math.min(Math.max(tri, dz), 0) + Math.hypot(Math.max(tri, 0), Math.max(dz, 0)), 0.012);
+  const tri2 = sdTri(x, y, -0.035, 0.018, 0.035, 0.018, -0.005, 0.055), dz2 = Math.abs(z) - 0.005;
+  d = smin(d, Math.min(Math.max(tri2, dz2), 0) + Math.hypot(Math.max(tri2, 0), Math.max(dz2, 0)), 0.008);
+  return d;
+}
+
+let body, jelly, core, teeth, eyes, bubbles, fishGeo, markers, markerPos, stomachE, meshLines, meshPos;
+const MK = { spine: 0, nSpine: 20, P0: 20, T: 21, LM: 22, U: 23, LO: 24, count: 25 };
+async function build() {
+  const step = async name => { $('loadStep').textContent = name; await new Promise(r => setTimeout(r, 30)); };
+  const B0 = [-1.72, -0.012, -0.78], CELL = 0.016, SX = 3.49, SY = 0.52, SZ = 1.56;
+  await step('signed distance field · jelly');
+  const J = surfaceNets(sdJelly, B0, CELL, Math.ceil(SX / CELL) + 1, Math.ceil(SY / CELL) + 1, Math.ceil(SZ / CELL) + 1);
+  J.attrs = jellyAttrs(J.pos);
+  await step('surface nets · cream core');
+  const C = surfaceNets(sdCore, B0, 0.022, Math.ceil(SX / 0.022) + 1, Math.ceil(SY / 0.022) + 1, Math.ceil(SZ / 0.022) + 1);
+  C.attrs = coreAttrs(C.pos);
+  const Tg = buildTeeth(), Eg = EYES.map(buildEye), Bg = buildBubbles();
+  // markers: spine chain, jaw frame
+  const M = new Float32Array(MK.count * 3);
+  for (let i = 0; i < MK.nSpine; i++) { const x = mix(L0 + 0.06, L1 - 0.1, i / (MK.nSpine - 1)); M[i * 3] = x; M[i * 3 + 1] = Math.min(0.045, topOf(x) * 0.45); M[i * 3 + 2] = zcOf(x); }
+  const zc = zcOf(XH + 0.3); const put = (k, x, y, z) => { M[k * 3] = x; M[k * 3 + 1] = y; M[k * 3 + 2] = z; };
+  put(MK.P0, XH, YM - 0.025, zcOf(XH)); put(MK.T, L1 - 0.15, YM - 0.032, zcOf(L1 - 0.15)); put(MK.LM, XH + 0.3, YM - 0.03, zc + 0.08);
+  const u = rotUp(L1 - 0.15, YM + 0.03); put(MK.U, u[0], u[1], zcOf(L1 - 0.15)); put(MK.LO, L1 - 0.15, YM - 0.032, zcOf(L1 - 0.15));
+  await step('tet lattice · snapping');
+  body = new SoftBody([J.pos, C.pos, Tg.pos, Eg[0].pos, Eg[1].pos, Bg.pos, M]);
+  await step('embedding');
+  jelly = new Skinned(J, body, jellyMat, [LAYER.JELLY, LAYER.SHADOW]);
+  const jellyBack = new THREE.Mesh(jelly.geo, thickBackMat); jellyBack.frustumCulled = false; jellyBack.layers.set(LAYER.THICK); scene.add(jellyBack);
+  core = new Skinned(C, body, coreMat, [LAYER.BG]);
+  const coreThick = new THREE.Mesh(core.geo, thickFrontMat); coreThick.frustumCulled = false; coreThick.layers.set(LAYER.THICK); scene.add(coreThick);
+  teeth = new Skinned(Tg, body, teethMat, [LAYER.BG, LAYER.SHADOW]);
+  eyes = Eg.map((g, i) => new Skinned(g, body, eyeMats[i], [LAYER.BG]));
+  bubbles = new Skinned(Bg, body, bubbleMat, [LAYER.BG]);
+  markers = body.embed(M); markerPos = new Float32Array(M.length);
+  stomachE = STOMACH.map(s => body.embed(new Float32Array(s)));
+  // fish geometry
+  const FB = [-0.135, -0.05, -0.03], FC = 0.0045;
+  const Fd = surfaceNets(sdFish, FB, FC, Math.ceil(0.27 / FC) + 1, Math.ceil(0.11 / FC) + 1, Math.ceil(0.06 / FC) + 1);
+  fishGeo = new THREE.BufferGeometry(); fishGeo.setAttribute('position', new THREE.BufferAttribute(Fd.pos, 3)); fishGeo.setAttribute('normal', new THREE.BufferAttribute(Fd.nrm, 3)); fishGeo.setIndex(new THREE.BufferAttribute(Fd.idx, 1));
+  // tet mesh overlay
+  meshPos = new Float32Array(body.edges.length * 6);
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(meshPos, 3).setUsage(THREE.DynamicDrawUsage));
+  meshLines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#1d1b18', transparent: true, opacity: 0.35 })); meshLines.frustumCulled = false; meshLines.layers.set(LAYER.MESH); scene.add(meshLines);
+  $('stNodes').textContent = body.n.toLocaleString(); $('stTets').textContent = body.nt.toLocaleString(); $('stVerts').textContent = (J.pos.length / 3 + C.pos.length / 3).toLocaleString();
+}
+
+/* ======================================================================
+   7. MUSCLES, FISH, STATE
+   ====================================================================== */
+const G = 9.8 / 1.35, DT = 1 / 60, SUB = 10;
+const state = { paused: false, slow: false, mesh: false, time: 0, way: 'moss', fish: 0, gapeDeg: 17, thrash: 0, kappa: 0, kappaT: 0, dirty: true, feedQueue: [], nearFood: false };
+const jaw = { phase: 'idle', t: 0, caught: null };
+const fishes = [], swallowed = [];
+const DEG = Math.PI / 180;
+function snap() { if (jaw.phase === 'idle' || jaw.phase === 'hold') { jaw.phase = 'open'; jaw.t = 0; } }
+function thrash() { state.thrash = 1.4; }
+function reset() { body.reset(); for (const f of fishes) scene.remove(f.mesh); fishes.length = 0; for (const f of swallowed) scene.remove(f.mesh); swallowed.length = 0; state.fish = 0; jaw.phase = 'idle'; jaw.caught = null; state.thrash = 0; body.gape = GAPE0; state.feedQueue.length = 0; state.dirty = true; }
+function updateJaw(dt) {
+  jaw.t += dt; let target, rate;
+  if (jaw.phase === 'open') { target = 40 * DEG; rate = 0.22; if (jaw.t > 0.24) { jaw.phase = 'slam'; jaw.t = 0; body.impulse((p, x, y, z, V) => { const w = sstep(0.2, 1.1, x); V[p * 3] += 1.5 * w; V[p * 3 + 1] += 0.35 * w; }); } }
+  else if (jaw.phase === 'slam') { target = 1 * DEG; rate = 0.55; if (jaw.t > 0.16) { jaw.phase = 'hold'; jaw.t = 0; swallowCaught(); } }
+  else if (jaw.phase === 'hold') { target = 1 * DEG; rate = 0.3; if (jaw.t > 0.5) { jaw.phase = 'idle'; jaw.t = 0; } }
+  else { target = state.nearFood ? 36 * DEG : REDUCED ? 14 * DEG : (11 + 5 * Math.sin(state.time * 0.55)) * DEG; rate = state.nearFood ? 0.16 : 0.05; }
+  body.gape += (target - body.gape) * rate;
+}
+function updateBend() {
+  const idleAmp = REDUCED ? 0 : 0.045, t = state.time, th = state.thrash;
+  body.setBend(x => {
+    const tailW = Math.pow(clamp((0.2 - x) / 1.75, 0, 1), 1.6);
+    let dz = idleAmp * tailW * Math.sin(2 * Math.PI * (x - L0) / 1.5 - 1.9 * t);
+    if (th > 0) { const env = Math.sin(Math.PI * (1 - th / 1.4)); dz += 0.26 * env * Math.pow(clamp((1.0 - x) / 2.5, 0, 1), 1.2) * Math.sin(2 * Math.PI * (x - L0) / 1.2 + (2 * Math.PI / 0.45) * (1.4 - th)); }
+    dz += state.kappa * Math.pow(Math.max(0, x - 0.5), 2) * 0.9;
+    return dz;
+  });
+}
+// ---- fish
+const tmpV = new V3(), tmpV2 = new V3(), tmpQ = new THREE.Quaternion(), tmpM = new THREE.Matrix4();
+class Fish {
+  constructor(p, v) {
+    this.mesh = new THREE.Mesh(fishGeo, fishMat); this.mesh.frustumCulled = false; this.mesh.layers.set(LAYER.BG); this.mesh.layers.enable(LAYER.SHADOW); scene.add(this.mesh);
+    this.p = p.clone(); this.v = v.clone(); this.q = new THREE.Quaternion().setFromUnitVectors(new V3(1, 0, 0), v.clone().normalize()); this.q.multiply(new THREE.Quaternion().setFromAxisAngle(new V3(1, 0, 0), Math.random() * 6.28));
+    this.w = new V3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 6); this.r = 0.034; this.rest = 0; this.state = 'air'; this.sync();
+  }
+  sync() { this.mesh.position.copy(this.p); this.mesh.quaternion.copy(this.q); }
+}
+function fishStep(dt) {
+  const X = body.X, V = body.V, n = body.n, rn = HL * 0.62;
+  for (const f of fishes) {
+    if (f.state === 'stomach' || f.state === 'caught') continue;
+    f.v.y -= G * dt; f.p.addScaledVector(f.v, dt);
+    const wl = f.w.length(); if (wl > 1e-6) { tmpQ.setFromAxisAngle(tmpV.copy(f.w).divideScalar(wl), wl * dt); f.q.premultiply(tmpQ); }
+    let onTable = false;
+    if (f.p.y < f.r) { f.p.y = f.r; if (f.v.y < 0) f.v.y = -f.v.y * 0.25; f.v.x *= 0.85; f.v.z *= 0.85; f.w.multiplyScalar(0.75); onTable = true; }
+    // collide with the jelly's nodes
+    const px = f.p.x, py = f.p.y, pz = f.p.z, rr = rn + f.r;
+    for (let p = 0; p < n; p++) {
+      const i = p * 3, dx = px - X[i], dy = py - X[i + 1], dz = pz - X[i + 2]; if (dx > rr || dx < -rr || dz > rr || dz < -rr || dy > rr || dy < -rr) continue;
+      const d2 = dx * dx + dy * dy + dz * dz; if (d2 >= rr * rr || d2 < 1e-10) continue;
+      const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, nz = dz / d, pen = rr - d;
+      f.p.x += nx * pen * 0.8; f.p.y += ny * pen * 0.8; f.p.z += nz * pen * 0.8;
+      const vn = f.v.x * nx + f.v.y * ny + f.v.z * nz; if (vn < 0) { f.v.x -= nx * vn * 1.25; f.v.y -= ny * vn * 1.25; f.v.z -= nz * vn * 1.25; V[i] += nx * vn * 0.6; V[i + 1] += ny * vn * 0.6; V[i + 2] += nz * vn * 0.6; }
+      f.v.multiplyScalar(0.97); f.w.multiplyScalar(0.9); if (ny > 0.5) onTable = true;
+    }
+    if (onTable && f.v.lengthSq() < 0.09) {
+      f.rest += dt;
+      // topple flat on the side, keeping the heading
+      tmpV.set(1, 0, 0).applyQuaternion(f.q); const psi = Math.atan2(tmpV.z, tmpV.x);
+      tmpM.makeBasis(new V3(Math.cos(psi), 0, Math.sin(psi)), new V3(Math.sin(psi), 0, -Math.cos(psi)), new V3(0, 1, 0)); tmpQ.setFromRotationMatrix(tmpM);
+      f.q.slerp(tmpQ, 0.14); f.w.multiplyScalar(0.5); f.r += (0.022 - f.r) * 0.1;
+    } else f.rest = 0;
+    f.sync();
+  }
+  // mouth frame from the embedded markers
+  body.skin(markers, markerPos);
+  const P0 = tmpV.set(markerPos[MK.P0 * 3], markerPos[MK.P0 * 3 + 1], markerPos[MK.P0 * 3 + 2]);
+  const ax = new V3(markerPos[MK.T * 3], markerPos[MK.T * 3 + 1], markerPos[MK.T * 3 + 2]).sub(P0); const jawLen = ax.length(); ax.divideScalar(jawLen);
+  const lat = new V3(markerPos[MK.LM * 3], markerPos[MK.LM * 3 + 1], markerPos[MK.LM * 3 + 2]).sub(P0); lat.addScaledVector(ax, -lat.dot(ax)).normalize();
+  const up = new V3().crossVectors(lat, ax);
+  const mouthC = P0.clone().addScaledVector(ax, jawLen * 0.55).addScaledVector(up, 0.05);
+  state.mouthC = mouthC; state.mouthAx = ax; state.mouthUp = up;
+  let near = false;
+  for (const f of fishes) {
+    if (f.state === 'stomach' || f.state === 'caught') continue;
+    if (f.p.distanceTo(mouthC) < 0.8 && f.v.lengthSq() > 0.16) near = true;
+    const d = tmpV2.copy(f.p).sub(P0); const a = d.dot(ax) / jawLen, l = d.dot(lat), u = d.dot(up);
+    if (a > 0.12 && a < 0.95 && Math.abs(l) < 0.1 && u > -0.02 && u < 0.14 && f.v.lengthSq() < 0.12 && jaw.phase === 'idle') { f.state = 'caught'; jaw.caught = f; snap(); }
+  }
+  state.nearFood = near;
+}
+function swallowCaught() {
+  const f = jaw.caught; jaw.caught = null; if (!f) return;
+  const slot = state.fish % STOMACH.length; f.state = 'stomach'; f.slot = slot; f.mesh.matrixAutoUpdate = false; f.mesh.layers.disable(LAYER.SHADOW);
+  fishes.splice(fishes.indexOf(f), 1); const old = swallowed.find(s => s.slot === slot); if (old) { scene.remove(old.mesh); swallowed.splice(swallowed.indexOf(old), 1); }
+  swallowed.push(f); state.fish++;
+}
+const stomachP = new Float32Array(3);
+function updateSwallowed() {
+  const F = body.FinvT;
+  for (const f of swallowed) {
+    const E = stomachE[f.slot]; body.skin(E, stomachP); const o = E.tet[0] * 9;
+    // F carries the stomach along; the fish lies flat, nose forward, scaled a little
+    tmpM.set(F[o] * 0.85, F[o + 1] * 0.85, F[o + 2] * 0.85, stomachP[0], F[o + 3] * 0.85, F[o + 4] * 0.85, F[o + 5] * 0.85, stomachP[1], F[o + 6] * 0.85, F[o + 7] * 0.85, F[o + 8] * 0.85, stomachP[2], 0, 0, 0, 1);
+    tmpM.multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)); f.mesh.matrix.copy(tmpM); f.mesh.matrixWorldNeedsUpdate = true;
+  }
+}
+function feed() {
+  for (let i = 0; i < 4; i++) state.feedQueue.push(0.22 * i + 0.01);
+}
+function launchFish() {
+  if (fishes.length > 14) { const f = fishes.shift(); scene.remove(f.mesh); }
+  const mc = state.mouthC || new V3(XH + 0.35, YM + 0.06, zcOf(XH + 0.35));
+  const start = new V3(L1 + 1.1 + Math.random() * 0.4, 0.22 + Math.random() * 0.1, mc.z + (Math.random() - 0.5) * 0.3);
+  const target = mc.clone().add(new V3(0, 0.02, (Math.random() - 0.5) * 0.06)), T = 0.5;
+  const v = target.clone().sub(start).divideScalar(T); v.y += 0.5 * G * T;
+  fishes.push(new Fish(start, v));
+}
+function simStep(dt) {
+  state.time += dt; if (state.thrash > 0) state.thrash = Math.max(0, state.thrash - dt);
+  for (let i = state.feedQueue.length - 1; i >= 0; i--) { state.feedQueue[i] -= dt; if (state.feedQueue[i] <= 0) { state.feedQueue.splice(i, 1); launchFish(); } }
+  state.kappa += (state.kappaT - state.kappa) * 0.04;
+  updateJaw(dt); updateBend(); body.rewriteRest(); body.step(dt, SUB, G); fishStep(dt); state.dirty = true;
+}
+
+/* ======================================================================
+   8. INTERACTION
+   ====================================================================== */
+const ray = new THREE.Raycaster(); ray.layers.enableAll(); const ndc = new THREE.Vector2(); const pointers = new Map();
+let grabbing = null, hintGone = false;
+function pointerNDC(e) { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); return ndc; }
+function pick(e) { ray.setFromCamera(pointerNDC(e), camera); jelly.geo.computeBoundingSphere(); const hits = ray.intersectObject(jelly.mesh, false); return hits.length ? hits[0].point : null; }
+const turnPlane = new THREE.Plane(new V3(0, 1, 0), -0.12);
+function updateTurn(e) { ray.setFromCamera(pointerNDC(e), camera); const p = ray.ray.intersectPlane(turnPlane, tmpV); if (!p) return; const ang = Math.atan2(p.z - zcOf(0.6), p.x - 0.6); state.kappaT = clamp(ang, -0.6, 0.6) * (p.x > 0.2 ? 1 : 0.4); }
+canvas.addEventListener('pointerdown', e => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (grabbing) { if (pointers.size === 2) { const [a, b] = [...pointers.values()]; grabbing.twist0 = Math.atan2(b.y - a.y, b.x - a.x) - body.grab.twist; } e.stopImmediatePropagation(); return; }
+  if (!jelly) return;
+  const hit = pick(e); if (!hit) return;
+  if (!body.startGrab(hit.x, hit.y, hit.z, 0.17)) return;
+  const dir = camera.getWorldDirection(new V3());
+  grabbing = { plane: new THREE.Plane().setFromNormalAndCoplanarPoint(dir, hit), twist0: 0 }; body.grab.axis = [-dir.x, -dir.y, -dir.z];
+  controls.enabled = false; canvas.setPointerCapture(e.pointerId); e.stopImmediatePropagation();
+  if (!hintGone) { hintGone = true; $('hint').classList.add('gone'); }
+}, { capture: true });
+window.addEventListener('pointermove', e => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (jelly) updateTurn(e);
+  if (!grabbing || !body.grab) return;
+  if (pointers.size >= 2) { const [a, b] = [...pointers.values()]; body.grab.twist = Math.atan2(b.y - a.y, b.x - a.x) - grabbing.twist0; return; }
+  ray.setFromCamera(pointerNDC(e), camera); const p = ray.ray.intersectPlane(grabbing.plane, tmpV); if (!p) return;
+  const t = body.grab.t; t[0] += (p.x - t[0]) * 0.5; t[1] += (Math.max(p.y, 0.02) - t[1]) * 0.5; t[2] += (p.z - t[2]) * 0.5;
+});
+const endPointer = e => { pointers.delete(e.pointerId); if (grabbing && pointers.size === 0) { grabbing = null; body.grab = null; controls.enabled = true; } };
+window.addEventListener('pointerup', endPointer); window.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', e => { if (grabbing && body.grab) { e.preventDefault(); e.stopImmediatePropagation(); body.grab.twist += e.deltaY * 0.004; } }, { passive: false, capture: true });
+window.addEventListener('keydown', e => {
+  const tag = (e.target && e.target.tagName) || ''; if (tag === 'INPUT' || tag === 'TEXTAREA' || !jelly) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); setPaused(!state.paused); } else if (k === 'f') feed(); else if (k === 's') snap(); else if (k === 't') thrash(); else if (k === 'r') reset(); else if (k === 'h') document.body.classList.toggle('hide-ui'); else if (k === 'm') { $('cMesh').checked = !$('cMesh').checked; $('cMesh').dispatchEvent(new Event('change')); }
+});
+
+/* ======================================================================
+   9. UI
+   ====================================================================== */
+function applyWay(key) {
+  const W = WAYS[key]; state.way = key; document.documentElement.style.setProperty('--acc', W.hex); $('swName').textContent = W.name;
+  jellyMat.uniforms.uCol.value.set(W.hex); const c = new THREE.Color(W.hex); jellyMat.uniforms.uScatter.value.copy(c).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(0.55);
+  bubbleMat.uniforms.uTint.value.copy(c).lerp(new THREE.Color(1, 1, 1), 0.6);
+  for (const m of eyeMats) m.uniforms.uIris.value.set(W.iris); fishMat.uniforms.uFish.value.set(W.fish);
+  for (const b of $('swatches').children) b.classList.toggle('on', b.dataset.key === key);
+}
+for (const key in WAYS) { const b = document.createElement('button'); b.dataset.key = key; b.title = WAYS[key].name; b.style.background = WAYS[key].hex; b.addEventListener('click', () => applyWay(key)); $('swatches').appendChild(b); }
+function setPaused(v) { state.paused = v; $('bPause').textContent = v ? 'Play' : 'Pause'; $('bPause').classList.toggle('on', v); }
+$('bFeed').addEventListener('click', feed); $('bSnap').addEventListener('click', snap); $('bThrash').addEventListener('click', thrash); $('bReset').addEventListener('click', reset); $('bPause').addEventListener('click', () => setPaused(!state.paused));
+$('sFirm').addEventListener('input', e => { body.params.firm = +e.target.value; $('oFirm').textContent = (+e.target.value).toFixed(2); });
+$('sDamp').addEventListener('input', e => { body.params.damp = +e.target.value; $('oDamp').textContent = (+e.target.value).toFixed(2); });
+$('cSlow').addEventListener('change', e => { state.slow = e.target.checked; e.target.nextElementSibling.textContent = state.slow ? 'on' : 'off'; });
+$('cMesh').addEventListener('change', e => { state.mesh = e.target.checked; e.target.nextElementSibling.textContent = state.mesh ? 'on' : 'off'; });
+
+/* ======================================================================
+   10. READOUTS, RESIZE, LOOP
+   ====================================================================== */
+function volume() { const P = jelly.pos, I = jelly.geo.index.array; let v = 0; for (let i = 0; i < I.length; i += 3) { const a = I[i] * 3, b = I[i + 1] * 3, c = I[i + 2] * 3; v += P[a] * (P[b + 1] * P[c + 2] - P[b + 2] * P[c + 1]) + P[a + 1] * (P[b + 2] * P[c] - P[b] * P[c + 2]) + P[a + 2] * (P[b] * P[c + 1] - P[b + 1] * P[c]); } return Math.abs(v) / 6; }
+let gape0 = null;
+function readouts() {
+  const m = volume() * Math.pow(1.35, 3) * 1300; $('roMass').innerHTML = `${m.toFixed(0)}<small>kg</small>`;
+  let len = 0; for (let i = 1; i < MK.nSpine; i++) len += Math.hypot(markerPos[i * 3] - markerPos[(i - 1) * 3], markerPos[i * 3 + 1] - markerPos[(i - 1) * 3 + 1], markerPos[i * 3 + 2] - markerPos[(i - 1) * 3 + 2]);
+  len += (L1 - L0) - (L1 - 0.1 - (L0 + 0.06)); // the two untracked end pieces
+  $('roLen').innerHTML = `${(len * 1.35).toFixed(2)}<small>m</small>`;
+  const P0 = new V3(markerPos[MK.P0 * 3], markerPos[MK.P0 * 3 + 1], markerPos[MK.P0 * 3 + 2]);
+  const U = new V3(markerPos[MK.U * 3], markerPos[MK.U * 3 + 1], markerPos[MK.U * 3 + 2]).sub(P0), LO = new V3(markerPos[MK.LO * 3], markerPos[MK.LO * 3 + 1], markerPos[MK.LO * 3 + 2]).sub(P0);
+  const ang = U.angleTo(LO); if (gape0 === null) gape0 = ang; state.gapeDeg = (ang - gape0) / DEG + 17;
+  $('roGape').innerHTML = `${Math.max(0, state.gapeDeg).toFixed(1)}<small>deg</small>`;
+  $('roFish').textContent = state.fish;
+}
+function resize() {
+  const stage = $('stage'), w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  const dw = renderer.domElement.width, dh = renderer.domElement.height;
+  if (!thickRT) thickRT = new THREE.WebGLRenderTarget(dw, dh, { type: THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, depthBuffer: true }); else thickRT.setSize(dw, dh);
+  if (bgTex) bgTex.dispose(); bgTex = new THREE.FramebufferTexture(dw, dh); bgTex.minFilter = bgTex.magFilter = THREE.LinearFilter;
+  jellyMat.uniforms.uBg.value = bgTex; jellyMat.uniforms.uThick.value = thickRT.texture; jellyMat.uniforms.uRes.value.set(dw, dh);
+  const want = 4.3 * clamp(1.5 / camera.aspect, 1, 2.6); const off = camera.position.clone().sub(controls.target); if (off.length() < want) { off.setLength(want); camera.position.copy(controls.target).add(off); }
+}
+window.addEventListener('resize', resize);
+function render() {
+  // 1. key-light shadow map
+  renderer.setRenderTarget(shadowRT); renderer.setClearColor(0xffffff, 1); renderer.clear(); scene.overrideMaterial = depthMat; renderer.render(scene, lightCam); scene.overrideMaterial = null;
+  // 2. back-face thickness pass (jelly back faces, core front faces)
+  renderer.setRenderTarget(thickRT); renderer.setClearColor(THICK_CLEAR, 1); renderer.clear(); camera.layers.set(LAYER.THICK); renderer.render(scene, camera);
+  // 3. everything behind the jelly, then grab it for refraction
+  renderer.setRenderTarget(null); renderer.setClearColor(BACKDROP, 1); renderer.clear(); camera.layers.set(LAYER.BG); renderer.render(scene, camera);
+  renderer.copyFramebufferToTexture(bgTex);
+  // 4. the jelly's front faces
+  camera.layers.set(LAYER.JELLY); renderer.render(scene, camera);
+  if (state.mesh) { camera.layers.set(LAYER.MESH); renderer.render(scene, camera); }
+}
+let last = performance.now(), acc = 0, fpsEma = 60, msEma = 8, frames = 0; const PROF = { sim: 0, skin: 0, render: 0 };
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dtR = Math.min((now - last) / 1000, 0.1); last = now; const t0 = performance.now();
+  controls.update();
+  if (!state.paused) { acc += dtR * (state.slow ? 0.25 : 1); let steps = 0; while (acc >= DT && steps < 3) { simStep(DT); acc -= DT; steps++; } if (steps === 3) acc = 0; }
+  const t1 = performance.now();
+  if (state.dirty) {
+    body.updateF(); jelly.update(); core.update(); teeth.update(); eyes[0].update(); eyes[1].update(); bubbles.update(); updateSwallowed();
+    if (state.mesh) { const X = body.X, E = body.edges; for (let i = 0; i < E.length; i++) { const a = (E[i] / 65536 | 0) * 3, b = (E[i] % 65536) * 3; meshPos[i * 6] = X[a]; meshPos[i * 6 + 1] = X[a + 1]; meshPos[i * 6 + 2] = X[a + 2]; meshPos[i * 6 + 3] = X[b]; meshPos[i * 6 + 4] = X[b + 1]; meshPos[i * 6 + 5] = X[b + 2]; } meshLines.geometry.attributes.position.needsUpdate = true; }
+    state.dirty = false;
+  }
+  jellyMat.uniforms.uTime.value = state.time;
+  const t2 = performance.now();
+  render();
+  const t3 = performance.now(); PROF.sim += (t1 - t0 - PROF.sim) * 0.1; PROF.skin += (t2 - t1 - PROF.skin) * 0.1; PROF.render += (t3 - t2 - PROF.render) * 0.1;
+  const ms = performance.now() - t0; msEma += (ms - msEma) * 0.08; fpsEma += (1 / Math.max(dtR, 1e-3) - fpsEma) * 0.06;
+  if ((++frames % 15) === 0) { $('stFps').textContent = fpsEma.toFixed(0); $('stMs').textContent = msEma.toFixed(1); readouts(); }
+}
+(async () => {
+  await build(); applyWay('moss'); resize();
+  body.rewriteRest(); body.updateF(); jelly.update(); core.update(); teeth.update(); eyes[0].update(); eyes[1].update(); bubbles.update(); body.skin(markers, markerPos); readouts();
+  $('loading').classList.add('gone');
+  window.__CJ = { PROF, THREE, body, renderer, scene, camera, controls, state, jaw, fishes, swallowed, feed, snap, thrash, reset, applyWay, setPaused, jellyMat, get fps() { return fpsEma; }, get ms() { return msEma; }, verts: jelly.pos.length / 3, setView(az, el, d) { const s = new THREE.Spherical(d, el, az); camera.position.copy(controls.target).add(new V3().setFromSpherical(s)); camera.lookAt(controls.target); } };
+  requestAnimationFrame(frame);
+})().catch(err => { console.error(err); $('loadStep').textContent = 'failed: ' + err.message; });
+</script>
+</body>
+</html>
